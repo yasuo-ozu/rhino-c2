@@ -26,13 +26,15 @@ struct rh_file {
 };
 
 /* initialized in rh_token.c */
-struct rh_token {
-	rh_token_type type;
-	char *ident;
-
-};
 enum rh_token_type {
-
+	TYP_NULL = 0,
+	// Genre : set by rh_next_token()
+	TYP_SYMBOL, TYP_IDENT, TYP_LITERAL, TYP_KEYWORD
 };
+struct rh_token {
+	enum rh_token_type type;
+	char *text;
+};
+
 
 

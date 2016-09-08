@@ -61,7 +61,12 @@ int rh_main(int argc, char **argv) {
 
 	rh_file *file;
 	for (;;) {
-		while (rh_getchar(ctx));
+		//while (rh_getchar(ctx));
+		for (;;) {
+			rh_token *token = rh_next_token(ctx);
+			if (token == NULL) break;
+			rh_dump_token(token);
+		}
 		file = ctx->file->next;
 		if (file == NULL) break;
 		rh_free_file(ctx->file);

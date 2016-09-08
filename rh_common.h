@@ -5,9 +5,7 @@
 #include <string.h>
 
 #define RH_FILENAME_MAXLEN	2048
-#define RH_MACRO_MAXNAME	64
-#define RH_MACRO_MAXLEN		2048
-#define RH_MACRO_MAXARGS	16
+#define RH_TOKEN_MAXLEN		2048
 
 
 #include "rh_def.h"
