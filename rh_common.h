@@ -10,7 +10,7 @@
 #define RH_MACRO_MAXARGS	16
 
 
-#include "rh_type.h"
+#include "rh_def.h"
 #include "rh_function.h"
 #include "rh_error.h"
 

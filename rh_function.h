@@ -12,3 +12,6 @@ void rh_free_file(rh_file *file);
 /* defined in rh_file.c */
 char rh_getchar(rh_context *ctx);
 
+/* defined in rh_token.c */
+rh_token *rh_next_token(rh_context *ctx);
+

@@ -2,6 +2,7 @@
 
 typedef struct rh_context	rh_context;
 typedef struct rh_file		rh_file;
+typedef enum   rh_token_type rh_token_type;
 typedef struct rh_token		rh_token;
 
 /* initialized in rh_main.c */
@@ -22,6 +23,16 @@ struct rh_file {
 	int is_linehead;	// reffed in rh_getchar()
 	rh_file *next;
 	rh_file *parent;
+};
+
+/* initialized in rh_token.c */
+struct rh_token {
+	rh_token_type type;
+	char *ident;
+
+};
+enum rh_token_type {
+
 };
 
 
