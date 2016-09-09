@@ -128,19 +128,21 @@ rh_token *rh_next_token(rh_context *ctx) {
 	} else if (c == '\'' || c == '"') {
 		token->type = TYP_LITERAL;
 		char a = c;
-		while (c != a) {
+		do {
 			c = rh_getchar(ctx);
 			if (c == '\\') {
 				c = rh_getchar(ctx);
 				if (c == 'n') c = '\n';
 				else if (c == 't') c = '\t';
 				else if (c == 'r') c = '\r';
+				// TODO: bugs when \", \'
 			}
 			if (c == '\n' || c == '\0') {
 				fprintf(stderr, "Literal reached end of line.\n");
 				exit(1);
 			}
-		}
+		} while (c != a);
+		c = rh_getchar(ctx);
 	} else {
 		token->type = TYP_SYMBOL;
 		int i, j, k = 0;

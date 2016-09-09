@@ -60,8 +60,12 @@ int rh_main(int argc, char **argv) {
 	}
 
 	rh_file *file;
+
+	ctx->memory = rh_malloc(RH_MEMORY_SIZE);
+	ctx->hp = 0;
+	ctx->sp = RH_MEMORY_SIZE - 1;
+
 	for (;;) {
-		//while (rh_getchar(ctx));
 		for (;;) {
 			rh_token *token = rh_next_token(ctx);
 			if (token == NULL) break;
