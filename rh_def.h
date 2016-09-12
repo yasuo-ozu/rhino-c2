@@ -24,7 +24,6 @@ struct rh_context {
 		int count;			// counter of messages[]
 		jmp_buf jmpbuf;
 	} error;
-		
 };
 
 /* initialized in rh_file.c */
@@ -41,9 +40,7 @@ struct rh_file {
 /* initialized in rh_token.c */
 enum rh_token_type {
 	TYP_NULL = 0,
-	// Genre : set by rh_next_token()
 	TYP_SYMBOL, TYP_IDENT, TYP_LITERAL, TYP_KEYWORD,
-	// Opecode: set
 };
 struct rh_token {
 	enum rh_token_type type;

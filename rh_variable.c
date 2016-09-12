@@ -1,13 +1,16 @@
 #include "rh_common.h"
 
-rh_variable *rh_init_variable() {
+rh_variable *rh_init_variable(rh_type *type) {
 	rh_variable *var = rh_malloc(sizeof(rh_variable));
 	var->token = NULL;
-	var->type = NULL;
+	var->type = type;
 	var->memory = NULL;
 	var->next = NULL;
 	var->is_dynamic = NULL;
 	var->is_left = 0;
+	if (type != NULL) {
+		var->memory = rh_malloc(rh_get_typesize(type));
+	}
 	return var;
 }
 

@@ -24,13 +24,32 @@ rh_token *rh_init_token(rh_context *ctx) {
 	return token;
 }
 
+void rh_dump_token_type(rh_type *type) {
+	if (type->child != NULL) rh_dump_token_type(type->child);
+	if (type->kind == RHTYP_POINTER) printf(" *");
+	if (type->kind == RHTYP_ARRAY) printf("[%d]", type->length);
+	if (type->kind == RHTYP_NUMERIC) printf("/num: %d,%d/", type->size, type->sign);
+	if (type->kind == RHTYP_FLOATING) printf("/flt: %d,%d/", type->size, type->sign);
+}
+
 void rh_dump_token(rh_token *token) {
 	if (token->type == TYP_SYMBOL) {
 		printf("SYMBOL: %s\n", token->text);
 	} else if (token->type == TYP_IDENT) {
 		printf("IDENT: %s\n", token->text);
 	} else if (token->type == TYP_LITERAL) {
-		printf("LITERAL\n");
+		printf("LITERAL: ");
+		rh_dump_token_type(token->variable->type);
+		if (token->variable->type == RHTYP_NUMERIC ||
+				token->variable->type == RHTYP_POINTER) {
+			long long intval = 0;
+			memcpy(&intval, token->variable->memory, rh_get_typesize(token->variable));
+			printf("%d\n", (int) intval);
+		} else if (token->variable->type == RHTYP_FLOATING) {
+			long double dblval = 0;
+			memcpy(&dblval, token->variable->memory, rh_get_typesize(token->variable));
+			printf("%lf\n", (double) dblval);
+		}
 	} else if (token->type == TYP_KEYWORD) {
 		printf("KEYWORD: %s\n", token->text);
 	}
@@ -64,7 +83,6 @@ rh_token *rh_next_token(rh_context *ctx) {
 		token->type = TYP_LITERAL;
 		long long intval = 0; long double dblval;
 		int isHex = 0, isDbl = 0, digit;
-		token->type = TYP_LITERAL;
 		if (c == '0') {
 			c = rh_getchar(ctx);
 			if (c == 'x' || c == 'X') {
@@ -130,22 +148,58 @@ rh_token *rh_next_token(rh_context *ctx) {
 		}
 		if (isDbl) size = countFloat ? 4 : countLong ? 16 : 8;
 		if (!isDbl) size = countLong == 2 ? 8 : 4, sign = !!countUnsigned;
+		rh_type *type = rh_init_type();
+		type->kind = isDbl ? RHTYP_FLOATING : RHTYP_NUMERIC;
+		type->size = size; type->sign = sign;
+		token->variable = rh_init_variable(type);
+		if (isDbl) {
+			memcpy(token->variable->memory, &dblval, size);
+		} else {
+			memcpy(token->variable->memory, &intval, size);
+		}
 	} else if (c == '\'' || c == '"') {
 		token->type = TYP_LITERAL;
 		char a = c;
-		do {
-			c = rh_getchar(ctx);
-			if (c == '\\') {
+		int count = 0, cval = 0, hp = ctx->hp;
+		rh_type *type = rh_init_type();
+		type->kind = RHTYP_NUMERIC;
+		type->size = 1; type->sign = 1;
+		if (a == '"') {
+			rh_type *type2 = rh_init_type();
+			type2->kind = RHTYP_POINTER;
+			type2->child = type;
+			type = type2;
+		}
+		while ((c = rh_getchar(ctx)) != a) {
+			if (c == '\n' || c == '\0') {
+				E_ERROR(ctx, "Literal reached end of line.");
+			} else if (c == '\\') {
 				c = rh_getchar(ctx);
 				if (c == 'n') c = '\n';
 				else if (c == 't') c = '\t';
 				else if (c == 'r') c = '\r';
-				// TODO: bugs when \", \'
 			}
-			if (c == '\n' || c == '\0') {
-				E_ERROR(ctx, "Literal reached end of line.");
+			if (a == '"') {
+				ctx->memory[hp + count] = c;
+			} else {
+				cval = cval << 8 + c;
 			}
-		} while (c != a);
+			count++;
+		}
+		if (a == '\'' && count > 1) type->size = 4;
+		if (a == '\'' && count == 0) {
+			E_ERROR(ctx, "char literal error");
+		}
+		rh_variable *var = rh_init_variable(type);
+		if (a == '"') {
+			ctx->memory[hp + count] = '\0';
+			*((int *) var->memory) = hp;
+			ctx->hp = hp + count + 1;
+		} else {
+			if (count > 1) *((int *) var->memory) = cval;
+			else *((signed char *) var->memory) = (signed char) cval;
+		}
+		token->variable = var;
 		c = rh_getchar(ctx);
 	} else {
 		token->type = TYP_SYMBOL;

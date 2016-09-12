@@ -85,11 +85,13 @@ int rh_main(int argc, char **argv) {
 	rh_free_file(ctx->file);
 
 	
-	rh_execute(ctx);
+	int ret = rh_execute(ctx);
 
 	if (ctx->error.count) {
 		rh_dump_error(ctx);
 	}
+
+	return ret;
 }
 
 int main(int argc, char **argv) {
