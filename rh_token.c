@@ -40,14 +40,14 @@ void rh_dump_token(rh_token *token) {
 	} else if (token->type == TYP_LITERAL) {
 		printf("LITERAL: ");
 		rh_dump_token_type(token->variable->type);
-		if (token->variable->type == RHTYP_NUMERIC ||
-				token->variable->type == RHTYP_POINTER) {
+		if (token->variable->type->kind == RHTYP_NUMERIC ||
+				token->variable->type->kind == RHTYP_POINTER) {
 			long long intval = 0;
-			memcpy(&intval, token->variable->memory, rh_get_typesize(token->variable));
+			memcpy(&intval, token->variable->memory, rh_get_typesize(token->variable->type));
 			printf("%d\n", (int) intval);
-		} else if (token->variable->type == RHTYP_FLOATING) {
+		} else if (token->variable->type->kind == RHTYP_FLOATING) {
 			long double dblval = 0;
-			memcpy(&dblval, token->variable->memory, rh_get_typesize(token->variable));
+			memcpy(&dblval, token->variable->memory, rh_get_typesize(token->variable->type));
 			printf("%lf\n", (double) dblval);
 		}
 	} else if (token->type == TYP_KEYWORD) {
