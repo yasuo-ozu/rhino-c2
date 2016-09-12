@@ -4,7 +4,7 @@ HEADERS = rh_*.h
 CC = /usr/bin/gcc
 CC_OPTS = 
 CC_RELEASE = -DRELEASE -DNDEBUG -Ofast -march=native
-CC_DEBUG = -DDEBUG -g3 -O0 -Wall -Wextra -pedantic
+CC_DEBUG = -DDEBUG -g3 -O0 -Wall -Wextra
 UPX = /usr/bin/upx
 
 .PHONY:	clean score log

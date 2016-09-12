@@ -1,10 +1,5 @@
-#include "common.h"
+#include "rh_common.h"
 
-extern const RH_TYPE_INT32		 = (rh_type *){RHTYP_NUMERIC, 0, NULL, sizeof(int), 1};
-extern const RH_TYPE_UINT32		 = (rh_type *){RHTYP_NUMERIC, 0, NULL, sizeof(unsigned int), 0};
-extern const RH_TYPE_CHARPTR	 = (rh_type *){RHTYP_POINTER, 0,
-										(rh_type *){RHTYP_NUMERIC, 0, NULL, 1, 1},
-									4, 0};
 rh_type *rh_init_type() {
 	rh_type *type = rh_malloc(sizeof(rh_type));
 	type->kind = RHTYP_NULL;
@@ -39,6 +34,10 @@ int rh_get_typesize(rh_type *type) {
 	if (type->kind == RHTYP_POINTER) return sizeof(int);
 	if (type->kind == RHTYP_ARRAY) return type->length * rh_get_typesize(type->child);
 	return type->size;
+}
+
+int rh_variable_to_int(rh_context *ctx, rh_variable *var) {
+	return (int) *(long long *) var->memory;
 }
 
 

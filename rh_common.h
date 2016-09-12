@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <setjmp.h>
+#include <stdarg.h>
 
 #define RH_FILENAME_MAXLEN	2048
 #define RH_TOKEN_MAXLEN		2048

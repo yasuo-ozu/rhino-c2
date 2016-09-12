@@ -16,6 +16,11 @@ rh_token *rh_init_token(rh_context *ctx) {
 	rh_token *token = rh_malloc(sizeof(rh_token));
 	token->type = TYP_NULL;
 	token->text = NULL;
+	token->next = NULL;
+	token->variable = NULL;
+	token->child[0] = NULL;
+	token->child[1] = NULL;
+	token->child[2] = NULL;
 	return token;
 }
 
@@ -120,8 +125,8 @@ rh_token *rh_next_token(rh_context *ctx) {
 		if (c == '_' || ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || 
 				('0' <= c && c <= '9') || isDbl && (countLong + countFloat > 1 || countUnsigned) ||
 				!isDbl && (countLong > 2 || countFloat || countUnsigned > 1)) {
-			fprintf(stderr, "Missing in flag.\n");
-			exit(1);
+			E_ERROR(ctx, "missing in flag.");
+			while (c != ' ' && c != '\n' && c != '\0') c = rh_getchar(ctx);
 		}
 		if (isDbl) size = countFloat ? 4 : countLong ? 16 : 8;
 		if (!isDbl) size = countLong == 2 ? 8 : 4, sign = !!countUnsigned;
@@ -138,8 +143,7 @@ rh_token *rh_next_token(rh_context *ctx) {
 				// TODO: bugs when \", \'
 			}
 			if (c == '\n' || c == '\0') {
-				fprintf(stderr, "Literal reached end of line.\n");
-				exit(1);
+				E_ERROR(ctx, "Literal reached end of line.");
 			}
 		} while (c != a);
 		c = rh_getchar(ctx);

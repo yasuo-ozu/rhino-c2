@@ -17,7 +17,14 @@ struct rh_context {
 	unsigned char *memory;
 	int hp, sp;
 	rh_variable *variable;
-	rh_token *token[1024];
+	rh_token *token;
+	struct {
+		char *messages[20];
+		int errors;			// counter of ETYPE_ERROR
+		int count;			// counter of messages[]
+		jmp_buf jmpbuf;
+	} error;
+		
 };
 
 /* initialized in rh_file.c */
@@ -42,10 +49,9 @@ struct rh_token {
 	enum rh_token_type type;
 	char *text;
 	rh_token *next;
+	rh_variable *variable;
 
-	/* Set in rh_parse() */
 	rh_token *child[3];
-	int address;	///< Set when TYP_CALL
 };
 
 /* initialized in rh_type.c */
@@ -65,6 +71,16 @@ struct rh_variable {
 	unsigned char *memory;
 	rh_variable *next;	///< Used when table entry
 	int is_dynamic;		///< Set when *memory is malloced.
-}
+	int is_left;
+};
+
+/* initialized in rh_error.c */
+typedef enum {
+	ETYPE_NOTICE = 1, ETYPE_WARNING = 2, ETYPE_ERROR = 3,
+	ETYPE_FATAL = 4,	/* error which stops compile immediately */
+	ETYPE_TRAP = 5,		/* error which occurs in and stops executing */
+	ETYPE_INTERNAL = 6	/* mainly thrown by rh_assert() */
+} rh_error_type;
+
 
 

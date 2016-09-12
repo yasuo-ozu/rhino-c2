@@ -21,14 +21,20 @@ rh_token *rh_next_token(rh_context *ctx);
 /* defined in rh_variable.c */
 rh_variable *rh_init_variable();
 void rh_free_variable(rh_variable *var);
+rh_variable *rh_search_variable(rh_context *ctx, char *ident);
 
 /* defined in rh_type.c */
 rh_type *rh_init_type();
 void rh_free_type(rh_type *type);
 rh_type *rh_dup_type(rh_type *orig);
 int rh_get_typesize(rh_type *type);
-extern const RH_TYPE_INT32;
-extern const RH_TYPE_UINT32;
-extern const RH_TYPE_CHARPTR;
+int rh_variable_to_int(rh_context *ctx, rh_variable *var);
+
+/* defined in rh_execute.c */
+int rh_execute(rh_context *ctx);
+
+/* defined in rh_error.c */
+void rh_error(rh_context *ctx, rh_error_type type, char *msg, ...);
+void rh_dump_error(rh_context *ctx);
 
 

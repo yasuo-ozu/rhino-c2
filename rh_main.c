@@ -11,8 +11,7 @@ void rh_read_options(rh_context *ctx, int argc, char **argv) {
 				c++;
 				if (strcmp(c, "dump") == 0) ctx->flag |= RHFLAG_DEBUG; 
 				else {
-					fprintf(stderr, "error: unrecognized option %s\n", c);
-					exit(1);
+					E_FATAL(ctx, "unrecognized option %s", c);
 				}
 			} else {
 				if (*c == '\0') {
@@ -21,8 +20,7 @@ void rh_read_options(rh_context *ctx, int argc, char **argv) {
 				for (; *c != '\0'; c++) {
 					if (*c == 'd') ctx->flag |= RHFLAG_DEBUG;
 					else {
-						fprintf(stderr, "error: unrecognized flag %c\n", *c);
-						exit(1);
+						E_FATAL(ctx, "unrecognized flag %c", *c);
 					}
 
 				}
@@ -42,6 +40,13 @@ int rh_main(int argc, char **argv) {
 	
 	ctx->file = NULL;
 	ctx->flag = 0;
+	ctx->error.count = 0;
+	ctx->error.errors = 0;
+
+	if (setjmp(&ctx->error.jmpbuf)) {
+		rh_dump_error(ctx);
+		return (1);
+	}
 
 	rh_read_options(ctx, argc, argv);
 
@@ -55,8 +60,7 @@ int rh_main(int argc, char **argv) {
 		}
 	}
 	if (ctx->file == NULL) {
-		fprintf(stderr, "error: souce file not specified.\n");
-		exit(1);
+		E_FATAL(ctx, "souce file not specified.");
 	}
 
 	rh_file *file;
@@ -64,20 +68,28 @@ int rh_main(int argc, char **argv) {
 	ctx->memory = rh_malloc(RH_MEMORY_SIZE);
 	ctx->hp = 0;
 	ctx->sp = RH_MEMORY_SIZE - 1;
+	ctx->token = NULL;
 
-	for (;;) {
-		for (;;) {
-			rh_token *token = rh_next_token(ctx);
-			if (token == NULL) break;
+	rh_token *token, *token_top = NULL;
+	while ((token = rh_next_token(ctx)) != NULL) {
+		if (ctx->flag & RHFLAG_DEBUG) {
 			rh_dump_token(token);
 		}
-		file = ctx->file->next;
-		if (file == NULL) break;
-		rh_free_file(ctx->file);
-		ctx->file = file;
+		if (token_top == NULL) {
+			ctx->token = token;
+		} else {
+			token_top->next = token;
+		}
+		token_top = token;
 	}
 	rh_free_file(ctx->file);
-	return 0;
+
+	
+	rh_execute(ctx);
+
+	if (ctx->error.count) {
+		rh_dump_error(ctx);
+	}
 }
 
 int main(int argc, char **argv) {
