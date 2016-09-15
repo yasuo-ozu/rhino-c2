@@ -26,3 +26,5 @@ score:	scsc ${SRCS} ${HEADERS}
 	@echo "## Line count:" `(LANG=C;wc -l ${SRCS} ${HEADERS}) | sed -n -e '/total/p'`
 log:
 	git log --pretty=format:" - %s %n   http://github.com/yasuo-ozu/rhino-c2/commit/%H" --since=10hour
+debug:	rhino
+	rlwrap ./rhino -d -
