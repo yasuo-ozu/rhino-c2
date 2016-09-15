@@ -6,7 +6,7 @@ rh_variable *rh_init_variable(rh_type *type) {
 	var->type = type;
 	var->memory = NULL;
 	var->next = NULL;
-	var->is_dynamic = NULL;
+	var->is_dynamic = 0;
 	var->is_left = 0;
 	if (type != NULL) {
 		var->memory = rh_malloc(rh_get_typesize(type));

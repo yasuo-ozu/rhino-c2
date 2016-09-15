@@ -41,7 +41,7 @@ int rh_variable_to_int(rh_context *ctx, rh_variable *var) {
 }
 
 rh_variable *rh_convert_type(rh_context ctx, rh_variable *var, int force) {
-
+	return NULL;
 }
 
 

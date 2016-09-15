@@ -143,8 +143,8 @@ rh_token *rh_next_token(rh_context *ctx) {
 			c = rh_getchar(ctx);
 		}
 		if (c == '_' || ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z') || 
-				('0' <= c && c <= '9') || isDbl && (countLong + countFloat > 1 || countUnsigned) ||
-				!isDbl && (countLong > 2 || countFloat || countUnsigned > 1)) {
+				('0' <= c && c <= '9') || (isDbl && (countLong + countFloat > 1 || countUnsigned)) ||
+				(!isDbl && (countLong > 2 || countFloat || countUnsigned > 1))) {
 			E_ERROR(ctx, "missing in flag.");
 			while (c != ' ' && c != '\n' && c != '\0') c = rh_getchar(ctx);
 		}

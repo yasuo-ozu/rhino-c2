@@ -43,7 +43,7 @@ int rh_main(int argc, char **argv) {
 	ctx->error.count = 0;
 	ctx->error.errors = 0;
 
-	if (setjmp(&ctx->error.jmpbuf)) {
+	if (setjmp(ctx->error.jmpbuf)) {
 		rh_dump_error(ctx);
 		return (1);
 	}
