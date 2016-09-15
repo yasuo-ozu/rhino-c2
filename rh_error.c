@@ -16,10 +16,14 @@ void rh_error(rh_context *ctx, rh_error_type type, char *msg, ...) {
 	else if (type == ETYPE_INTERNAL)strcpy(c, ESC_ANSI_RED		("INTERNAL: "));
 	c += strlen(buf);
 	vsnprintf(c, 1023 - strlen(buf), msg, va);
-	ctx->error.messages[ctx->error.count++] = rh_malloc_string(buf);
-	if (type == ETYPE_ERROR) ctx->error.errors++;
-	if (type == ETYPE_INTERNAL || type == ETYPE_FATAL || ctx->error.errors >= 5) {
-		longjmp(ctx->error.jmpbuf, 1);
+	if (ctx->flag & RHFLAG_DEBUG) {
+		fprintf(stderr, "  %s\n", buf);
+	} else {
+		ctx->error.messages[ctx->error.count++] = rh_malloc_string(buf);
+		if (type == ETYPE_ERROR) ctx->error.errors++;
+		if (type == ETYPE_INTERNAL || type == ETYPE_FATAL || ctx->error.errors >= 5) {
+			longjmp(ctx->error.jmpbuf, 1);
+		}
 	}
 }
 
