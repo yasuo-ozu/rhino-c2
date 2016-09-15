@@ -38,17 +38,19 @@ void rh_dump_token(rh_token *token) {
 	} else if (token->type == TYP_IDENT) {
 		printf("IDENT: %s\n", token->text);
 	} else if (token->type == TYP_LITERAL) {
+		rh_variable *var = token->variable;
 		printf("LITERAL: ");
-		rh_dump_token_type(token->variable->type);
-		if (token->variable->type->kind == RHTYP_NUMERIC ||
-				token->variable->type->kind == RHTYP_POINTER) {
+		rh_dump_token_type(var->type);
+		if (var->type->kind == RHTYP_NUMERIC || var->type->kind == RHTYP_POINTER) {
 			long long intval = 0;
-			memcpy(&intval, token->variable->memory, rh_get_typesize(token->variable->type));
+			memcpy(&intval, var->memory, rh_get_typesize(var->type));
 			printf("%d\n", (int) intval);
-		} else if (token->variable->type->kind == RHTYP_FLOATING) {
-			long double dblval = 0;
-			memcpy(&dblval, token->variable->memory, rh_get_typesize(token->variable->type));
-			printf("%lf\n", (double) dblval);
+		} else if (var->type->kind == RHTYP_FLOATING) {
+			double dblval = 0;
+			if (var->type->size == 16) dblval = (double) *(long double *) var->memory;
+			if (var->type->size == 8) dblval = (double) *(double *) var->memory;
+			if (var->type->size == 4) dblval = (double) *(float *) var->memory;
+			printf("%lf\n", dblval);
 		}
 	} else if (token->type == TYP_KEYWORD) {
 		printf("KEYWORD: %s\n", token->text);
@@ -153,7 +155,9 @@ rh_token *rh_next_token(rh_context *ctx) {
 		type->size = size; type->sign = sign;
 		token->variable = rh_init_variable(type);
 		if (isDbl) {
-			memcpy(token->variable->memory, &dblval, size);
+			if (size == 16) (*(long double *) token->variable->memory) = dblval;
+			if (size == 8) (*(double *) token->variable->memory) = (double) dblval;
+			if (size == 4) (*(float *) token->variable->memory) = (float) dblval;
 		} else {
 			memcpy(token->variable->memory, &intval, size);
 		}
