@@ -11,9 +11,23 @@ rh_file *rh_init_file_from_fp(FILE *fp) {
 	return file;
 }
 
-rh_file *rh_init_file(char *fname) {
-	FILE *fp = fopen(fname, "r");
+rh_file *rh_init_file(char *fname, int searchLocal) {
+	FILE *fp = NULL;
 	rh_file *file = NULL;
+	char buf[RH_FILENAME_MAXLEN];
+	static char *include_dir[] = {
+		"./include/", NULL
+	};
+	int i = 0;
+	if (searchLocal) {
+		fp = fopen(fname, "r");
+	}
+	while (fp == NULL && include_dir[i] != NULL) {
+		strcpy(buf, include_dir[i]);
+		strcpy(buf + strlen(buf), fname);
+		fp = fopen(buf, "r");
+		i++;
+	}
 	if (fp != NULL) {
 		file = rh_init_file_from_fp(fp);
 		file->name = rh_malloc(strlen(fname) + 1);
@@ -98,7 +112,7 @@ char rh_getc(rh_context *ctx) {
 }
 
 void rh_getchar_preprocess_include(rh_context *ctx, char *fname, char a) {
-	rh_file *file = rh_init_file(fname);
+	rh_file *file = rh_init_file(fname, a == '"');
 	if (file == NULL) {
 		// TODO: open from /usr/include
 		fprintf(stderr, "Include file open error: %s\n", fname);

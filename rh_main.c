@@ -26,7 +26,7 @@ void rh_read_options(rh_context *ctx, int argc, char **argv) {
 				}
 			}
 		} else {
-			file = rh_init_file(c);
+			file = rh_init_file(c, 1);
 			if (nextFile == NULL) ctx->file = file;
 			else nextFile->next = file;
 			nextFile = file;

@@ -7,7 +7,7 @@ void *rh_malloc_string(char *s);
 
  /* defined in rh_file.c */
 rh_file *rh_init_file_from_fp(FILE *fp);
-rh_file *rh_init_file(char *fname);
+rh_file *rh_init_file(char *fname, int searchLocal);
 void rh_free_file(rh_file *file);
 
 /* defined in rh_file.c */
