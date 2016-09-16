@@ -96,11 +96,6 @@ int is_equal_operator(char *text) {
 	return 0;
 }
 
-rh_variable *rh_execute_calculation_pre(rh_context *ctx, rh_variable *var, rh_token *token) {
-	E_ERROR(ctx, "Not implemented");
-	return NULL;
-}
-
 int variable_get_long_double(rh_variable *var, long double *dblval) {
 	if (var->type->kind == RHTYP_NUMERIC) {
 		long long intval = 0;
@@ -115,18 +110,57 @@ int variable_get_long_double(rh_variable *var, long double *dblval) {
 	return 1;
 }
 
+rh_variable *rh_execute_calculation_pre(rh_context *ctx, rh_variable *var, rh_token *token) {
+	if (var == NULL) return NULL;
+	rh_type *type = rh_dup_type(var->type);
+	rh_variable *ret = rh_init_variable(type);
+	if (var->type->kind == RHTYP_NUMERIC) {
+		long long int1 = 0, int2 = 0;
+		memcpy(&int1, var->memory, type->size);
+		if      (token_cmp(token, "+"))	int2 =   int1;
+		else if (token_cmp(token, "-")) int2 =  -int1;
+		else if (token_cmp(token, "!")) int2 =  !int1;
+		else if (token_cmp(token, "~")) int2 =  ~int1;
+		else {
+			E_ERROR(ctx, "Operator '%s' error", token->text);
+			rh_free_variable(ret);
+			rh_free_type(type);
+			return NULL;
+		}
+		memcpy(ret->memory, &int2, type->size);
+		return ret;
+	} else if (var->type->kind == RHTYP_FLOATING) {
+		long double dbl1, dbl2;
+		variable_get_long_double(var, &dbl1);
+		if      (token_cmp(token, "+"))	dbl2 =   dbl1;
+		else if (token_cmp(token, "-")) dbl2 =  -dbl1;
+		else if (token_cmp(token, "!")) dbl2 =  !dbl1;
+		else {
+			E_ERROR(ctx, "Operator '%s' error", token->text);
+			rh_free_variable(ret);
+			rh_free_type(type);
+			return NULL;
+		}
+		if      (type->size ==  4) (*(float *)			ret->memory) = (float) dbl2;
+		else if (type->size ==  8) (*(double *)			ret->memory) = (double) dbl2;
+		else if (type->size == 16) (*(long double *)	ret->memory) = dbl2;
+		return ret;
+	}
+	return NULL;
+}
+
 rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, rh_variable *var2, rh_token *token) {
 	if (var1 == NULL || var2 == NULL) return NULL;
 	if ((var1->type->kind == RHTYP_NUMERIC && var2->type->kind == RHTYP_FLOATING) ||
 			(var1->type->kind == RHTYP_NUMERIC && var2->type->kind == RHTYP_POINTER)) {
 		rh_variable *tmp = var1; var1 = var2; var2 = tmp;
 	}
+	rh_type *type = rh_init_type();
+	type->size = MAX(var1->type->size, var2->type->size);
+	rh_variable *ret = rh_init_variable(type);
 	if (var1->type->kind == RHTYP_NUMERIC && var2->type->kind == RHTYP_NUMERIC) {
-		rh_type *type = rh_init_type();
 		type->kind = RHTYP_NUMERIC;
-		type->size = MAX(var1->type->size, var2->type->size);
 		type->sign = MIN(var1->type->sign, var2->type->sign);
-		rh_variable *ret = rh_init_variable(type);
 		long long int1 = 0, int2 = 0, int3 = 0;
 		memcpy(&int1, var1->memory, var1->type->size);
 		memcpy(&int2, var2->memory, var2->type->size);
@@ -151,19 +185,20 @@ rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, r
 		else if (token_cmp(token, ","))		int3 = int2;
 		else {
 			E_ERROR(ctx, "Operator '%s' error", token->text);
+			rh_free_variable(ret);
+			rh_free_type(type);
 			return NULL;
 		}
 		memcpy(ret->memory, &int3, type->size);
 		return ret;
 	} else if (var1->type->kind == RHTYP_FLOATING) {
-		rh_type *type = rh_init_type();
 		type->kind = RHTYP_FLOATING;
-		type->size = MAX(var1->type->size, var2->type->size);
-		rh_variable *ret = rh_init_variable(type);
 		long double dbl1 = 0, dbl2 = 0, dbl3 = 0;
 		if (!variable_get_long_double(var1, &dbl1) ||
 			!variable_get_long_double(var2, &dbl2)) {
 			E_ERROR(ctx, "Invalid operand type");
+			rh_free_variable(ret);
+			rh_free_type(type);
 			return NULL;
 		}
 		if      (token_cmp(token, "+"))		dbl3 = dbl1 +  dbl2;
@@ -181,6 +216,8 @@ rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, r
 		else if (token_cmp(token, ","))		dbl3 = dbl2;
 		else {
 			E_ERROR(ctx, "Operator '%s' error", token->text);
+			rh_free_variable(ret);
+			rh_free_type(type);
 			return NULL;
 		}
 		if (type->size == 4) (*(float *)ret->memory) = (float) dbl3;
@@ -191,6 +228,8 @@ rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, r
 
 	}
 	E_ERROR(ctx, "Operator '%s' type error", token->text);
+	rh_free_variable(ret);
+	rh_free_type(type);
 	return NULL;
 }
 
