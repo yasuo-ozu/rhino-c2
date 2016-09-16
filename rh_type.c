@@ -28,8 +28,13 @@ void rh_dump_type(rh_type *type) {
 	if (type->child != NULL) rh_dump_type(type->child);
 	if (type->kind == RHTYP_POINTER) printf(" *");
 	if (type->kind == RHTYP_ARRAY) printf("[%d]", type->length);
-	if (type->kind == RHTYP_NUMERIC) printf("/num: %d,%d/", type->size, type->sign);
-	if (type->kind == RHTYP_FLOATING) printf("/flt: %d,%d/", type->size, type->sign);
+	if (type->kind == RHTYP_NUMERIC) {
+		printf("%s %s", type->sign ? "signed" : "unsigned",
+				type->size == 8 ? "long long" : type->size == 4 ? "int" : type->size == 2 ? "short": "char");
+	}
+	if (type->kind == RHTYP_FLOATING) {
+		printf("%s", type->size == 16 ? "long double" : type->size == 8 ? "double" : "float");
+	}
 }
 
 void rh_free_type(rh_type *type) {

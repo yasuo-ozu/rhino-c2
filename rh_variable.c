@@ -22,7 +22,9 @@ void rh_free_variable(rh_variable *var) {
 }
 
 void rh_dump_variable(rh_variable *var) {
+	printf("(");
 	rh_dump_type(var->type);
+	printf(") ");
 	if (var->type->kind == RHTYP_NUMERIC || var->type->kind == RHTYP_POINTER) {
 		long long intval = 0;
 		memcpy(&intval, var->memory, rh_get_typesize(var->type));
@@ -34,7 +36,6 @@ void rh_dump_variable(rh_variable *var) {
 		if (var->type->size == 4) dblval = (double) *(float *) var->memory;
 		printf("%lf\n", dblval);
 	}
-	
 }
 
 rh_variable *rh_search_variable(rh_context *ctx, char *ident) {

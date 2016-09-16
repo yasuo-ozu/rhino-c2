@@ -1,7 +1,10 @@
 #include "rh_common.h"
 
 char *token_keyword_table[] = {
-	"if", "else", "do", "while", "switch", "return", "continue", NULL
+	"_Bool", "char", "short", "int", "long", "signed", "unsigned", "float", "double", "_Complex", "_Imaginary",
+	"struct", "union", "enum", "volatile", "const", "restrict", "auto", "extern", "static", "register",
+	"typedef", "void", "if", "else", "switch", "case", "default", "for", "do", "while", "goto", "continue", "break", "return",
+	"inline", "sizeof", NULL
 };
 
 char *token_symbol_table[] = {
