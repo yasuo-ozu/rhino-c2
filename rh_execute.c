@@ -327,7 +327,8 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 
 int rh_execute(rh_context *ctx) {
 	rh_variable *var = rh_execute_expression(ctx, EM_ENABLED, 0);
-	printf("\n\n%d\n", *(int *)var->memory);
+	printf("RESULT:\n");
+	rh_dump_variable(var);
 	return 0;
 }
 

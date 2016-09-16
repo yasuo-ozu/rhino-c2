@@ -20,6 +20,7 @@ rh_token *rh_next_token(rh_context *ctx);
 
 /* defined in rh_variable.c */
 rh_variable *rh_init_variable();
+void rh_dump_variable(rh_variable *var);
 void rh_free_variable(rh_variable *var);
 rh_variable *rh_search_variable(rh_context *ctx, char *ident);
 
@@ -27,6 +28,7 @@ rh_variable *rh_search_variable(rh_context *ctx, char *ident);
 rh_type *rh_init_type();
 void rh_free_type(rh_type *type);
 rh_type *rh_dup_type(rh_type *orig);
+void rh_dump_type(rh_type *type);
 int rh_get_typesize(rh_type *type);
 int rh_variable_to_int(rh_context *ctx, rh_variable *var);
 

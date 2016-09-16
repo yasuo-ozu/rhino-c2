@@ -24,6 +24,14 @@ rh_type *rh_dup_type(rh_type *orig) {
 	return type;
 }
 
+void rh_dump_type(rh_type *type) {
+	if (type->child != NULL) rh_dump_type(type->child);
+	if (type->kind == RHTYP_POINTER) printf(" *");
+	if (type->kind == RHTYP_ARRAY) printf("[%d]", type->length);
+	if (type->kind == RHTYP_NUMERIC) printf("/num: %d,%d/", type->size, type->sign);
+	if (type->kind == RHTYP_FLOATING) printf("/flt: %d,%d/", type->size, type->sign);
+}
+
 void rh_free_type(rh_type *type) {
 	if (type == NULL) return;
 	rh_free_type(type->child);
