@@ -186,7 +186,7 @@ rh_token *rh_next_token(rh_context *ctx) {
 			if (a == '"') {
 				ctx->memory[hp + count] = c;
 			} else {
-				cval = cval << 8 + c;
+				cval = (cval << 8) + c;
 			}
 			count++;
 		}
