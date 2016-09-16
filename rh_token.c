@@ -132,7 +132,7 @@ rh_token *rh_next_token(rh_context *ctx) {
 			while (c != ' ' && c != '\n' && c != '\0') c = rh_getchar(ctx);
 		}
 		if (isDbl) size = countFloat ? 4 : countLong ? 16 : 8;
-		if (!isDbl) size = countLong == 2 ? 8 : 4, sign = !!countUnsigned;
+		if (!isDbl) size = countLong == 2 ? 8 : 4, sign = !countUnsigned;
 		rh_type *type = rh_init_type();
 		type->kind = isDbl ? RHTYP_FLOATING : RHTYP_NUMERIC;
 		type->size = size; type->sign = sign;
