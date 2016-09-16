@@ -1,7 +1,7 @@
 #include "rh_common.h"
 
 rh_token *token_next(rh_context *ctx) {
-	return ctx->token = ctx->token->next;
+	return ctx->token == NULL ? NULL : (ctx->token = ctx->token->next);
 }
 
 int token_cmp(rh_token *token, char *ident) {
@@ -40,6 +40,7 @@ int get_priority(rh_token *token, rh_operator_type type) {
 		{"&=", 15, OP_BINARY}, {"^=", 15, OP_BINARY}, {"|=", 15, OP_BINARY}, {",", 16, OP_BINARY}, {0, 0, OP_BINARY}
 	};
 	int i;
+	if (token == NULL || token->type != TYP_SYMBOL) return -1;
 	for (i = 0; priority_table[i].symbol; i++) {
 		if (priority_table[i].type & type && token_cmp(token, priority_table[i].symbol)) {
 			return priority_table[i].priority;
@@ -71,11 +72,16 @@ rh_variable *expression_with_paren(rh_context *ctx, rh_execute_mode execMode) {
 
 rh_variable *rh_execute_expression_internal_term(rh_context *ctx, rh_execute_mode execMode) {
 	rh_variable *ret = NULL;
-	if (ctx->token->type == TYP_LITERAL) ret = ctx->token->variable;
-	else if (ctx->token->type == TYP_IDENT) ret = search_declarator(ctx, ctx->token->text);
-	else if (token_cmp(ctx->token, "(")) ret = expression_with_paren(ctx, execMode);
-	if (ret == NULL) {
+	if (ctx->token->type == TYP_LITERAL) {
+		ret = ctx->token->variable;
+		token_next(ctx);
+	} else if (ctx->token->type == TYP_IDENT) {
+		ret = search_declarator(ctx, ctx->token->text);
+		token_next(ctx);
+	} else if (token_cmp(ctx->token, "(")) ret = expression_with_paren(ctx, execMode);
+	else {
 		E_ERROR(ctx, "Invalid endterm '%s'", ctx->token->text);
+		token_next(ctx);
 	}
 	return ret;
 }
@@ -91,7 +97,22 @@ int is_equal_operator(char *text) {
 }
 
 rh_variable *rh_execute_calculation_pre(rh_context *ctx, rh_variable *var, rh_token *token) {
+	E_ERROR(ctx, "Not implemented");
 	return NULL;
+}
+
+int variable_get_long_double(rh_variable *var, long double *dblval) {
+	if (var->type->kind == RHTYP_NUMERIC) {
+		long long intval = 0;
+		memcpy(&intval, var->memory, var->type->size);
+		*dblval = (long double) intval;
+	} else if (var->type->kind == RHTYP_FLOATING) {
+		if (var->type->size == 4) *dblval = (long double) *(float *) var->memory;
+		else if (var->type->size == 8) *dblval = (long double) *(double *) var->memory;
+		else if (var->type->size == 16) *dblval = *(long double *) var->memory;
+		else return 0;
+	} else return 0;
+	return 1;
 }
 
 rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, rh_variable *var2, rh_token *token) {
@@ -135,19 +156,51 @@ rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, r
 		memcpy(ret->memory, &int3, type->size);
 		return ret;
 	} else if (var1->type->kind == RHTYP_FLOATING) {
-		// TODO
+		rh_type *type = rh_init_type();
+		type->kind = RHTYP_FLOATING;
+		type->size = MAX(var1->type->size, var2->type->size);
+		rh_variable *ret = rh_init_variable(type);
+		long double dbl1 = 0, dbl2 = 0, dbl3 = 0;
+		if (!variable_get_long_double(var1, &dbl1) ||
+			!variable_get_long_double(var2, &dbl2)) {
+			E_ERROR(ctx, "Invalid operand type");
+			return NULL;
+		}
+		if      (token_cmp(token, "+"))		dbl3 = dbl1 +  dbl2;
+		else if (token_cmp(token, "-"))		dbl3 = dbl1 -  dbl2;
+		else if (token_cmp(token, "*"))		dbl3 = dbl1 *  dbl2;
+		else if (token_cmp(token, "/"))		dbl3 = dbl1 /  dbl2;
+		else if (token_cmp(token, "<"))		dbl3 = dbl1 <  dbl2;
+		else if (token_cmp(token, "<="))	dbl3 = dbl1 <= dbl2;
+		else if (token_cmp(token, ">"))		dbl3 = dbl1 >  dbl2;
+		else if (token_cmp(token, ">="))	dbl3 = dbl1 >= dbl2;
+		else if (token_cmp(token, "=="))	dbl3 = dbl1 == dbl2;
+		else if (token_cmp(token, "!="))	dbl3 = dbl1 != dbl2;
+		else if (token_cmp(token, "&&"))	dbl3 = dbl1 && dbl2;
+		else if (token_cmp(token, "||"))	dbl3 = dbl1 || dbl2;
+		else if (token_cmp(token, ","))		dbl3 = dbl2;
+		else {
+			E_ERROR(ctx, "Operator '%s' error", token->text);
+			return NULL;
+		}
+		if (type->size == 4) (*(float *)ret->memory) = (float) dbl3;
+		if (type->size == 8) (*(double *)ret->memory) = (double) dbl3;
+		if (type->size == 16) (*(long double *)ret->memory) = dbl3;
+		return ret;
 	} else if (var1->type->kind == RHTYP_POINTER && var2->type->kind == RHTYP_NUMERIC) {
-		// TODO
+
 	}
 	E_ERROR(ctx, "Operator '%s' type error", token->text);
 	return NULL;
 }
 
 rh_variable *rh_execute_calculation_post(rh_context *ctx, rh_variable *var, rh_token *token) {
+	E_ERROR(ctx, "Not implemented");
 	return NULL;
 }
 
 rh_variable *rh_execute_calculation_equal(rh_context *ctx, rh_variable *var1, rh_variable *var2, rh_token *token) {
+	E_ERROR(ctx, "Not implemented");
 	return NULL;
 }
 
@@ -156,7 +209,7 @@ rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_ex
 	else {
 		rh_variable *ret = NULL, *var;
 		rh_token *token = ctx->token, *token1;
-		if (get_priority(token, OP_PREFIX)) {
+		if (get_priority(token, OP_PREFIX) == priority) {
 			token_next(ctx);
 			ret = rh_execute_expression_internal(ctx, priority, execMode, isVector);
 			if (ret != NULL && execMode == EM_ENABLED) ret = rh_execute_calculation_pre(ctx, ret, token);
@@ -186,17 +239,17 @@ rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_ex
 						ctx->token = token1;
 					}
 				} else {
-					do {
+					if (execMode == EM_ENABLED) {
+						ctx->token = token;
+						ret = rh_execute_expression_internal(ctx, priority - 1, execMode, isVector);
+					}
+					while (get_priority(ctx->token, OP_BINARY) == priority) {
 						// TODO: %%,||を使用時にオペランド1の結果によってオペランド2を評価するかしないか判断
 						token1 = ctx->token;
-						if (execMode == EM_ENABLED) {
-							ctx->token = token;
-							ret = rh_execute_expression_internal(ctx, priority - 1, execMode, isVector);
-						}
 						token_next(ctx);
 						var = rh_execute_expression_internal(ctx, priority - 1, execMode, isVector);
 						if (execMode == EM_ENABLED) ret = rh_execute_calculation_binary(ctx, ret, var, token1);
-					} while (get_priority(ctx->token, OP_BINARY) == priority);
+					}
 				}
 			} else {
 				if (execMode == EM_ENABLED) {
@@ -229,9 +282,13 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 	if (token_cmp_skip(ctx, "if")) {
 
 	}
+
+	return SR_NORMAL;
 }
 
 int rh_execute(rh_context *ctx) {
+	rh_variable *var = rh_execute_expression(ctx, EM_ENABLED, 0);
+	printf("\n\n%d\n", *(int *)var->memory);
 	return 0;
 }
 
