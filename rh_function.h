@@ -25,6 +25,7 @@ void rh_free_variable(rh_variable *var);
 rh_variable *rh_search_variable(rh_context *ctx, char *ident);
 rh_variable *rh_convert_variable(rh_context *ctx, rh_variable *var, rh_type *type, int force);
 int rh_variable_to_int(rh_context *ctx, rh_variable *var, int *intval);
+void rh_assign_variable(rh_context *ctx, rh_variable *dest, rh_variable *src);
 
 /* defined in rh_type.c */
 rh_type *rh_init_type();

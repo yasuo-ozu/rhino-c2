@@ -93,4 +93,9 @@ int rh_variable_to_int(rh_context *ctx, rh_variable *var, int *intval) {
 	return 1;
 }
 
+void rh_assign_variable(rh_context *ctx, rh_variable *dest, rh_variable *src) {
+	rh_variable *var = rh_convert_variable(ctx, src, dest->type, 0);
+	memcpy(dest->memory, src->memory, dest->type->size);
+}
+
 

@@ -462,11 +462,17 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 				rh_token *idToken;
 				rh_type *sType = read_type_declarator(ctx, type, &idToken, 1, execMode);
 				if (type != NULL) {
+					rh_variable *var;
 					if (execMode == EM_ENABLED) {
-						rh_variable *var = rh_init_variable(ctx);
+						var = rh_init_variable(sType);	// TODO: スタックに確保する
 						var->token = idToken;
-						var->type = sType;
 						var->is_left = 1;
+					}
+					if (token_cmp_skip(ctx, "=")) {
+						rh_variable *var2 = rh_execute_expression(ctx, execMode, 1);
+						rh_assign_variable(ctx, var, var2);
+					}
+					if (execMode == EM_ENABLED) {
 						var->next = ctx->variable;
 						ctx->variable = var;
 					}
@@ -488,11 +494,6 @@ int rh_execute(rh_context *ctx) {
 	while (ctx->token != NULL) {
 		rh_execute_statement(ctx, EM_ENABLED);
 	}
-	/*
-	rh_variable *var = rh_execute_expression(ctx, EM_ENABLED, 0);
-	printf("RESULT:\n");
-	rh_dump_variable(var);
-	*/
 	return 0;
 }
 
