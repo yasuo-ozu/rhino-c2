@@ -374,39 +374,37 @@ rh_type *read_type_speifier(rh_context *ctx, rh_execute_mode execMode) {
 
 rh_type *read_type_declarator(rh_context *ctx, rh_type *parent, rh_token **pToken, int identMode, rh_execute_mode execMode) {
 	rh_type *ret = NULL;
-	// TODO: このままだとidが不必要なときに正しく処理できないかも
-	if (ctx->token->type == TYP_IDENT) {
-		if (identMode == -1) {
-			E_ERROR(ctx, "Unexpected identifier");
-		} else if (pToken != NULL) *pToken = ctx->token;
-		ret = parent;
-		token_next(ctx);
-	} else if (token_cmp_skip(ctx, "(")) {
+	if (token_cmp_skip(ctx, "(")) {
 		ret = read_type_declarator(ctx, parent, pToken, identMode, execMode);
 		token_cmp_error_skip(ctx, ")");
-	} else {
-		int ptr = 0;
-		if (token_cmp_skip(ctx, "*")) ptr = 1;
+	} else if (token_cmp_skip(ctx, "*")) {
 		ret = read_type_declarator(ctx, parent, pToken, identMode, execMode);
-		if (ptr) {
-			if (execMode == EM_DISABLED) return NULL;
-			rh_type *type = rh_init_type();
-			type->kind = RHTYP_POINTER;
-			type->size = 4;
-			type->child = ret;
-			ret = type;
-		} else if (token_cmp_skip(ctx, "[")) {
-			rh_variable *var = rh_execute_expression(ctx, execMode, 1);
-			token_cmp_error_skip(ctx, "]");
-			if (execMode == EM_DISABLED) return NULL;
-			rh_type *type = rh_init_type();
-			int i;
-			rh_variable_to_int(ctx, var, &i);
-			type->length = i;
-			type->child = ret;
-			type->size = ret->size * i;
-			ret = type;
+		rh_type *type = rh_init_type();
+		type->child = ret;
+		type->kind = RHTYP_POINTER;
+		type->size = 4;
+		ret = type;
+	} else {
+		ret = parent;
+		if (ctx->token->type == TYP_IDENT) {
+			if (identMode == -1) {
+				E_ERROR(ctx, "Unexpected identifier");
+			} else if (pToken != NULL) *pToken = ctx->token;
+			token_next(ctx);
 		}
+	}
+	while (token_cmp_skip(ctx, "[")) {
+		rh_variable *var = rh_execute_expression(ctx, execMode, 1);
+		token_cmp_error_skip(ctx, "]");
+		if (execMode == EM_DISABLED) return NULL;
+		rh_type *type = rh_init_type();
+		int i;
+		rh_variable_to_int(ctx, var, &i);
+		rh_free_variable(var);
+		type->length = i;
+		type->child = ret;
+		type->size = ret->size * i;
+		ret = type;
 	}
 	return ret;
 }
@@ -514,9 +512,9 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 					}
 					if (token_cmp_skip(ctx, "=")) {
 						var2 = rh_execute_expression(ctx, execMode, 1);
+						if (execMode == EM_ENABLED) rh_assign_variable(ctx, var, var2);
 					}
 					if (execMode == EM_ENABLED) {
-						rh_assign_variable(ctx, var, var2);
 						var->next = ctx->variable;
 						ctx->variable = var;
 					}
