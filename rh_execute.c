@@ -254,7 +254,7 @@ rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_ex
 			if (ret != NULL && execMode == EM_ENABLED) ret = rh_execute_calculation_pre(ctx, ret, token);
 		} else {
 			rh_execute_expression_internal(ctx, priority - 1, EM_DISABLED, isVector);
-			if (get_priority(ctx->token, OP_BINARY) == priority) {
+			if (!(isVector && token_cmp(ctx->token, ",")) && get_priority(ctx->token, OP_BINARY) == priority) {
 				if (is_equal_operator(ctx->token->text)) {
 					rh_token *buf[20];
 					int count = 0;
@@ -282,7 +282,7 @@ rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_ex
 						ctx->token = token;
 						ret = rh_execute_expression_internal(ctx, priority - 1, execMode, isVector);
 					}
-					while (get_priority(ctx->token, OP_BINARY) == priority) {
+					while (!(isVector && token_cmp(ctx->token, ",")) && get_priority(ctx->token, OP_BINARY) == priority) {
 						// TODO: %%,||を使用時にオペランド1の結果によってオペランド2を評価するかしないか判断
 						token1 = ctx->token;
 						token_next(ctx);
@@ -462,17 +462,17 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 				rh_token *idToken;
 				rh_type *sType = read_type_declarator(ctx, type, &idToken, 1, execMode);
 				if (type != NULL) {
-					rh_variable *var;
+					rh_variable *var, *var2;
 					if (execMode == EM_ENABLED) {
 						var = rh_init_variable(sType);	// TODO: スタックに確保する
 						var->token = idToken;
 						var->is_left = 1;
 					}
 					if (token_cmp_skip(ctx, "=")) {
-						rh_variable *var2 = rh_execute_expression(ctx, execMode, 1);
-						rh_assign_variable(ctx, var, var2);
+						var2 = rh_execute_expression(ctx, execMode, 1);
 					}
 					if (execMode == EM_ENABLED) {
+						rh_assign_variable(ctx, var, var2);
 						var->next = ctx->variable;
 						ctx->variable = var;
 					}
