@@ -5,7 +5,7 @@ rh_token *token_next(rh_context *ctx) {
 }
 
 int token_cmp(rh_token *token, char *ident) {
-	return token != NULL && !strcmp(token->text, ident);
+	return token != NULL && token->type != TYP_LITERAL && !strcmp(token->text, ident);
 }
 
 int token_cmp_skip(rh_context *ctx, char *ident) {
@@ -480,7 +480,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			if (execMode == EM_ENABLED && res != SR_NORMAL) execMode = EM_DISABLED;
 		}
 		token_cmp_error_skip(ctx, "}");
-		while (ctx->variable == varTop) {
+		while (ctx->variable != varTop) {
 			rh_variable *tmpVar = ctx->variable;
 			ctx->variable = tmpVar->next;
 			rh_free_variable(tmpVar);
@@ -517,8 +517,10 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			} while (ctx->token != NULL && token_cmp_skip(ctx, ","));
 		} else {
 			rh_variable *var = rh_execute_expression(ctx, execMode, 0);
-			printf("RESULT:\n");
-			rh_dump_variable(var);
+			if (execMode == EM_ENABLED) {
+				printf("RESULT:\n");
+				rh_dump_variable(ctx, var);
+			}
 		}
 	}
 	if (needsSemicolon) token_cmp_error_skip(ctx, ";");

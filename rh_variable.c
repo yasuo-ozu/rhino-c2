@@ -21,7 +21,7 @@ void rh_free_variable(rh_variable *var) {
 	rh_free(var);
 }
 
-void rh_dump_variable(rh_variable *var) {
+void rh_dump_variable(rh_context *ctx, rh_variable *var) {
 	if (var == NULL) {
 		printf("NULL\n");
 		return;
@@ -32,6 +32,9 @@ void rh_dump_variable(rh_variable *var) {
 	if (var->type->kind == RHTYP_NUMERIC || var->type->kind == RHTYP_POINTER) {
 		long long intval = 0;
 		memcpy(&intval, var->memory, rh_get_typesize(var->type));
+		if (var->type->kind == RHTYP_POINTER && var->type->child->kind == RHTYP_NUMERIC && var->type->child->size == 1) {
+			printf("\"%s\" ", ctx->memory + intval);
+		}
 		printf("%d\n", (int) intval);
 	} else if (var->type->kind == RHTYP_FLOATING) {
 		double dblval = 0;

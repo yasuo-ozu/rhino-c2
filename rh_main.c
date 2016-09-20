@@ -73,7 +73,7 @@ int rh_main(int argc, char **argv) {
 	rh_token *token, *token_top = NULL;
 	while ((token = rh_next_token(ctx)) != NULL) {
 		if (ctx->flag & RHFLAG_DEBUG) {
-			rh_dump_token(token);
+			rh_dump_token(ctx, token);
 		}
 		if (token_top == NULL) {
 			ctx->token = token;

@@ -27,14 +27,14 @@ rh_token *rh_init_token(rh_context *ctx) {
 	return token;
 }
 
-void rh_dump_token(rh_token *token) {
+void rh_dump_token(rh_context *ctx, rh_token *token) {
 	if (token->type == TYP_SYMBOL) {
 		printf("SYMBOL: %s\n", token->text);
 	} else if (token->type == TYP_IDENT) {
 		printf("IDENT: %s\n", token->text);
 	} else if (token->type == TYP_LITERAL) {
 		printf("LITERAL: ");
-		rh_dump_variable(token->variable);
+		rh_dump_variable(ctx, token->variable);
 	} else if (token->type == TYP_KEYWORD) {
 		printf("KEYWORD: %s\n", token->text);
 	}
