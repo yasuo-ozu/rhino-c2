@@ -22,6 +22,10 @@ void rh_free_variable(rh_variable *var) {
 }
 
 void rh_dump_variable(rh_variable *var) {
+	if (var == NULL) {
+		printf("NULL\n");
+		return;
+	}
 	printf("(");
 	rh_dump_type(var->type);
 	printf(") ");

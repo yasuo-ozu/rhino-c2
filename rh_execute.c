@@ -117,10 +117,12 @@ rh_variable *rh_execute_calculation_pre(rh_context *ctx, rh_variable *var, rh_to
 	if (var->type->kind == RHTYP_NUMERIC) {
 		long long int1 = 0, int2 = 0;
 		memcpy(&int1, var->memory, type->size);
-		if      (token_cmp(token, "+"))	int2 =   int1;
-		else if (token_cmp(token, "-")) int2 =  -int1;
-		else if (token_cmp(token, "!")) int2 =  !int1;
-		else if (token_cmp(token, "~")) int2 =  ~int1;
+		if      (token_cmp(token, "+"))	 int2 =   int1;
+		else if (token_cmp(token, "-"))  int2 =  -int1;
+		else if (token_cmp(token, "!"))  int2 =  !int1;
+		else if (token_cmp(token, "~"))	 int2 =  ~int1;
+		else if (token_cmp(token, "++")) int2 = ++int1;
+		else if (token_cmp(token, "--")) int2 = --int1;
 		else {
 			E_ERROR(ctx, "Operator '%s' error", token->text);
 			rh_free_variable(ret);
@@ -128,6 +130,8 @@ rh_variable *rh_execute_calculation_pre(rh_context *ctx, rh_variable *var, rh_to
 			return NULL;
 		}
 		memcpy(ret->memory, &int2, type->size);
+		if (token_cmp(token, "++") || token_cmp(token, "--"))
+			memcpy(var->memory, &int1, type->size);
 		return ret;
 	} else if (var->type->kind == RHTYP_FLOATING) {
 		long double dbl1, dbl2;
@@ -238,7 +242,24 @@ rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, r
 }
 
 rh_variable *rh_execute_calculation_post(rh_context *ctx, rh_variable *var, rh_token *token) {
-	E_ERROR(ctx, "Not implemented");
+	if (var == NULL) return NULL;
+	rh_type *type = rh_dup_type(var->type);
+	rh_variable *ret = rh_init_variable(type);
+	if (var->type->kind == RHTYP_NUMERIC) {
+		long long int1 = 0, int2 = 0;
+		memcpy(&int1, var->memory, type->size);
+		if (token_cmp(token, "++")) int2 = int1++;
+		else if (token_cmp(token, "--")) int2 = int1--;
+		else {
+			E_ERROR(ctx, "Operator '%s' error", token->text);
+			rh_free_variable(ret);
+			rh_free_type(type);
+			return NULL;
+		}
+		memcpy(ret->memory, &int2, type->size);
+		memcpy(var->memory, &int1, type->size);
+		return ret;
+	}
 	return NULL;
 }
 
