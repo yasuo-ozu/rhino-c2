@@ -88,7 +88,7 @@ rh_variable *rh_execute_expression_internal_term(rh_context *ctx, rh_execute_mod
 
 int is_equal_operator(char *text) {
 	static char *eqopTable[] = {
-		"&&=", "||=", "<<=", ">>=", "+=", "-=", "*=", "/=", "|=", "&=", "^=", NULL
+		"&&=", "||=", "<<=", ">>=", "+=", "-=", "*=", "/=", "|=", "&=", "^=", "=", NULL
 	};
 	for (int i = 0; eqopTable[i] != NULL; i++) {
 		if (strcmp(eqopTable[i], text) == 0) return 1;
@@ -149,8 +149,7 @@ rh_variable *rh_execute_calculation_pre(rh_context *ctx, rh_variable *var, rh_to
 	return NULL;
 }
 
-rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, rh_variable *var2, rh_token *token) {
-	if (var1 == NULL || var2 == NULL) return NULL;
+rh_variable *rh_execute_calculation_binary_internal(rh_context *ctx, rh_variable *var1, rh_variable *var2, char *op) {
 	if ((var1->type->kind == RHTYP_NUMERIC && var2->type->kind == RHTYP_FLOATING) ||
 			(var1->type->kind == RHTYP_NUMERIC && var2->type->kind == RHTYP_POINTER)) {
 		rh_variable *tmp = var1; var1 = var2; var2 = tmp;
@@ -164,27 +163,27 @@ rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, r
 		long long int1 = 0, int2 = 0, int3 = 0;
 		memcpy(&int1, var1->memory, var1->type->size);
 		memcpy(&int2, var2->memory, var2->type->size);
-		if      (token_cmp(token, "+"))		int3 = int1 +  int2;
-		else if (token_cmp(token, "-"))		int3 = int1 -  int2;
-		else if (token_cmp(token, "*"))		int3 = int1 *  int2;
-		else if (token_cmp(token, "/"))		int3 = int1 /  int2;
-		else if (token_cmp(token, "%"))		int3 = int1 %  int2;
-		else if (token_cmp(token, "<<"))	int3 = int1 << int2;
-		else if (token_cmp(token, ">>"))	int3 = int1 >> int2;
-		else if (token_cmp(token, "<"))		int3 = int1 <  int2;
-		else if (token_cmp(token, "<="))	int3 = int1 <= int2;
-		else if (token_cmp(token, ">"))		int3 = int1 >  int2;
-		else if (token_cmp(token, ">="))	int3 = int1 >= int2;
-		else if (token_cmp(token, "=="))	int3 = int1 == int2;
-		else if (token_cmp(token, "!="))	int3 = int1 != int2;
-		else if (token_cmp(token, "&"))		int3 = int1 &  int2;
-		else if (token_cmp(token, "^"))		int3 = int1 ^  int2;
-		else if (token_cmp(token, "|"))		int3 = int1 |  int2;
-		else if (token_cmp(token, "&&"))	int3 = int1 && int2;
-		else if (token_cmp(token, "||"))	int3 = int1 || int2;
-		else if (token_cmp(token, ","))		int3 = int2;
+		if      (strcmp(op,  "+") == 0)	int3 = int1 +  int2;
+		else if (strcmp(op,  "-") == 0)	int3 = int1 -  int2;
+		else if (strcmp(op,  "*") == 0)	int3 = int1 *  int2;
+		else if (strcmp(op,  "/") == 0)	int3 = int1 /  int2;
+		else if (strcmp(op,  "%") == 0)	int3 = int1 %  int2;
+		else if (strcmp(op, "<<") == 0)	int3 = int1 << int2;
+		else if (strcmp(op, ">>") == 0)	int3 = int1 >> int2;
+		else if (strcmp(op,  "<") == 0)	int3 = int1 <  int2;
+		else if (strcmp(op, "<=") == 0)	int3 = int1 <= int2;
+		else if (strcmp(op,  ">") == 0)	int3 = int1 >  int2;
+		else if (strcmp(op, ">=") == 0)	int3 = int1 >= int2;
+		else if (strcmp(op, "==") == 0)	int3 = int1 == int2;
+		else if (strcmp(op, "!=") == 0)	int3 = int1 != int2;
+		else if (strcmp(op,  "&") == 0)	int3 = int1 &  int2;
+		else if (strcmp(op,  "^") == 0)	int3 = int1 ^  int2;
+		else if (strcmp(op,  "|") == 0)	int3 = int1 |  int2;
+		else if (strcmp(op, "&&") == 0)	int3 = int1 && int2;
+		else if (strcmp(op, "||") == 0)	int3 = int1 || int2;
+		else if (strcmp(op,  ",") == 0)	int3 = int2;
 		else {
-			E_ERROR(ctx, "Operator '%s' error", token->text);
+			E_ERROR(ctx, "Operator '%s' error", op);
 			rh_free_variable(ret);
 			rh_free_type(type);
 			return NULL;
@@ -201,21 +200,21 @@ rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, r
 			rh_free_type(type);
 			return NULL;
 		}
-		if      (token_cmp(token, "+"))		dbl3 = dbl1 +  dbl2;
-		else if (token_cmp(token, "-"))		dbl3 = dbl1 -  dbl2;
-		else if (token_cmp(token, "*"))		dbl3 = dbl1 *  dbl2;
-		else if (token_cmp(token, "/"))		dbl3 = dbl1 /  dbl2;
-		else if (token_cmp(token, "<"))		dbl3 = dbl1 <  dbl2;
-		else if (token_cmp(token, "<="))	dbl3 = dbl1 <= dbl2;
-		else if (token_cmp(token, ">"))		dbl3 = dbl1 >  dbl2;
-		else if (token_cmp(token, ">="))	dbl3 = dbl1 >= dbl2;
-		else if (token_cmp(token, "=="))	dbl3 = dbl1 == dbl2;
-		else if (token_cmp(token, "!="))	dbl3 = dbl1 != dbl2;
-		else if (token_cmp(token, "&&"))	dbl3 = dbl1 && dbl2;
-		else if (token_cmp(token, "||"))	dbl3 = dbl1 || dbl2;
-		else if (token_cmp(token, ","))		dbl3 = dbl2;
+		if      (strcmp(op,  "+") == 0)	dbl3 = dbl1 +  dbl2;
+		else if (strcmp(op,  "-") == 0)	dbl3 = dbl1 -  dbl2;
+		else if (strcmp(op,  "*") == 0)	dbl3 = dbl1 *  dbl2;
+		else if (strcmp(op,  "/") == 0)	dbl3 = dbl1 /  dbl2;
+		else if (strcmp(op,  "<") == 0)	dbl3 = dbl1 <  dbl2;
+		else if (strcmp(op, "<=") == 0)	dbl3 = dbl1 <= dbl2;
+		else if (strcmp(op,  ">") == 0)	dbl3 = dbl1 >  dbl2;
+		else if (strcmp(op, ">=") == 0)	dbl3 = dbl1 >= dbl2;
+		else if (strcmp(op, "==") == 0)	dbl3 = dbl1 == dbl2;
+		else if (strcmp(op, "!=") == 0)	dbl3 = dbl1 != dbl2;
+		else if (strcmp(op, "&&") == 0)	dbl3 = dbl1 && dbl2;
+		else if (strcmp(op, "||") == 0)	dbl3 = dbl1 || dbl2;
+		else if (strcmp(op,  ",") == 0)	dbl3 = dbl2;
 		else {
-			E_ERROR(ctx, "Operator '%s' error", token->text);
+			E_ERROR(ctx, "Operator '%s' error", op);
 			rh_free_variable(ret);
 			rh_free_type(type);
 			return NULL;
@@ -227,10 +226,15 @@ rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, r
 	} else if (var1->type->kind == RHTYP_POINTER && var2->type->kind == RHTYP_NUMERIC) {
 
 	}
-	E_ERROR(ctx, "Operator '%s' type error", token->text);
+	E_ERROR(ctx, "Operator '%s' type error", op);
 	rh_free_variable(ret);
 	rh_free_type(type);
 	return NULL;
+}
+
+rh_variable *rh_execute_calculation_binary(rh_context *ctx, rh_variable *var1, rh_variable *var2, rh_token *token) {
+	if (var1 == NULL || var2 == NULL) return NULL;
+	return rh_execute_calculation_binary_internal(ctx, var1, var2, token->text);
 }
 
 rh_variable *rh_execute_calculation_post(rh_context *ctx, rh_variable *var, rh_token *token) {
@@ -239,8 +243,18 @@ rh_variable *rh_execute_calculation_post(rh_context *ctx, rh_variable *var, rh_t
 }
 
 rh_variable *rh_execute_calculation_equal(rh_context *ctx, rh_variable *var1, rh_variable *var2, rh_token *token) {
-	E_ERROR(ctx, "Not implemented");
-	return NULL;
+	if (var1 == NULL || var2 == NULL) return NULL;
+	char buf[RH_TOKEN_MAXLEN];
+	rh_variable *ret = NULL;
+	if (token_cmp_skip(ctx, "=")) {
+		ret = var2;
+	} else {
+		strcpy(buf, token->text);
+		buf[strlen(buf) - 1] = '\0';
+		ret = rh_execute_calculation_binary_internal(ctx, var1, var2, buf);
+	}
+	if (ret != NULL) rh_assign_variable(ctx, var1, ret);
+	return ret;
 }
 
 rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_execute_mode execMode, int isVector) {
@@ -451,7 +465,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			rh_free_variable(tmpVar);
 		}
 		needsSemicolon = 0;
-	} else if (token_cmp(ctx, ";"));
+	} else if (token_cmp(ctx->token, ";"));
 	else if (token_cmp_skip(ctx, "break")) res = SR_BREAK;
 	else if (token_cmp_skip(ctx, "continue")) res = SR_CONTINUE;
 	else if (token_cmp_skip(ctx, "return")) res = SR_RETURN;
