@@ -428,6 +428,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			res = rh_execute_statement(ctx, execMode && !i && res == SR_NORMAL);
 		needsSemicolon = 0;
 	} else if (token_cmp_skip(ctx, "while")) {
+		token = ctx->token;
 		for (;;) {
 			var = expression_with_paren(ctx, execMode);
 			rh_variable_to_int(ctx, var, &i);
@@ -439,6 +440,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		}
 		needsSemicolon = 0;
 	} else if (token_cmp_skip(ctx, "do")) {
+		token = ctx->token;
 		for (;;) {
 			res = rh_execute_statement(ctx, execMode);
 			token_cmp_error_skip(ctx, "while");
@@ -464,7 +466,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			token1 = ctx->token;
 			rh_execute_expression(ctx, EM_DISABLED, 0);
 			token_cmp_error_skip(ctx, ")");
-			res = rh_execute_statement(ctx, execMode);
+			res = rh_execute_statement(ctx, execMode && i);
 			if (execMode == EM_DISABLED || !i || res == SR_BREAK) {
 				res = SR_NORMAL; break;
 			} else if (res == SR_RETURN) break;
