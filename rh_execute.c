@@ -5,7 +5,7 @@ rh_token *token_next(rh_context *ctx) {
 }
 
 int token_cmp(rh_token *token, char *ident) {
-	return !strcmp(token->text, ident);
+	return token != NULL && !strcmp(token->text, ident);
 }
 
 int token_cmp_skip(rh_context *ctx, char *ident) {
@@ -311,24 +311,188 @@ rh_variable *rh_execute_expression(rh_context *ctx, rh_execute_mode execMode, in
 	return rh_execute_expression_internal(ctx, 16, execMode, isVector);
 }
 
+rh_type *read_type_speifier(rh_context *ctx, rh_execute_mode execMode) {
+	rh_type *ret = NULL;
+	int signedCount = 0, unsignedCount = 0, longCount = 0, size = 0, count = 0;
+	for (;;) {
+		if (token_cmp_skip(ctx, "unsigned")) unsignedCount++, size = 4;
+		else if (token_cmp_skip(ctx, "signed")) signedCount++, size = 4;
+		else if (token_cmp_skip(ctx, "long")) longCount++, size = 4;
+		else if (token_cmp_skip(ctx, "char")) size = 1, count++;
+		else if (token_cmp_skip(ctx, "short")) size = 2, count++;
+		else if (token_cmp_skip(ctx, "int")) size = 4, count++;
+		else break;
+	}
+	if (size > 0) {
+		if (count > 1 || signedCount + unsignedCount > 1 || longCount > 2 || (longCount && size != 4)) {
+			E_ERROR(ctx, "Type error");
+			return NULL;
+		}
+		ret = rh_init_type();
+		if (longCount == 2) size = 8;
+		ret->size = size;
+		ret->sign = signedCount - unsignedCount;
+		ret->kind = RHTYP_NUMERIC;
+	}
+	return ret;
+}
+
+rh_type *read_type_declarator(rh_context *ctx, rh_type *parent, rh_token **pToken, int identMode, rh_execute_mode execMode) {
+	rh_type *ret = NULL;
+	// TODO: このままだとidが不必要なときに正しく処理できないかも
+	if (ctx->token->type == TYP_IDENT) {
+		if (identMode == -1) {
+			E_ERROR(ctx, "Unexpected identifier");
+		} else if (pToken != NULL) *pToken = ctx->token;
+		ret = parent;
+		token_next(ctx);
+	} else if (token_cmp_skip(ctx, "(")) {
+		ret = read_type_declarator(ctx, parent, pToken, identMode, execMode);
+		token_cmp_error_skip(ctx, ")");
+	} else {
+		int ptr = 0;
+		if (token_cmp_skip(ctx, "*")) ptr = 1;
+		ret = read_type_declarator(ctx, parent, pToken, identMode, execMode);
+		if (ptr) {
+			if (execMode == EM_DISABLED) return NULL;
+			rh_type *type = rh_init_type();
+			type->kind = RHTYP_POINTER;
+			type->size = 4;
+			type->child = ret;
+			ret = type;
+		} else if (token_cmp_skip(ctx, "[")) {
+			rh_variable *var = rh_execute_expression(ctx, execMode, 1);
+			token_cmp_error_skip(ctx, "]");
+			if (execMode == EM_DISABLED) return NULL;
+			rh_type *type = rh_init_type();
+			int i;
+			rh_variable_to_int(ctx, var, &i);
+			type->length = i;
+			type->child = ret;
+			type->size = ret->size * i;
+			ret = type;
+		}
+	}
+	return ret;
+}
+
 typedef enum {
 	SR_NORMAL = 0, SR_RETURN, SR_CONTINUE, SR_BREAK
 } rh_statement_result;
 
 rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMode) {
-	int needsSemicolon = 1;
+	int needsSemicolon = 1, i;
 	rh_statement_result res = SR_NORMAL;
+	rh_token *token = ctx->token, *token1;
+	rh_variable *var;
 	if (token_cmp_skip(ctx, "if")) {
-
+		var = expression_with_paren(ctx, execMode);
+		rh_variable_to_int(ctx, var, &i);
+		res = rh_execute_statement(ctx, execMode && i);
+		if (token_cmp_skip(ctx, "else"))
+			res = rh_execute_statement(ctx, execMode && !i && res == SR_NORMAL);
+		needsSemicolon = 0;
+	} else if (token_cmp_skip(ctx, "while")) {
+		for (;;) {
+			var = expression_with_paren(ctx, execMode);
+			rh_variable_to_int(ctx, var, &i);
+			res = rh_execute_statement(ctx, execMode && i);
+			if (!execMode || !i || res == SR_BREAK) {
+				res = SR_NORMAL; break;
+			} else if (res == SR_RETURN) break;
+			ctx->token = token;
+		}
+		needsSemicolon = 0;
+	} else if (token_cmp_skip(ctx, "do")) {
+		for (;;) {
+			res = rh_execute_statement(ctx, execMode);
+			token_cmp_error_skip(ctx, "while");
+			var = expression_with_paren(ctx, execMode);
+			if (execMode == EM_DISABLED || res == SR_RETURN) break;
+			if (res == SR_BREAK) {
+				res = SR_NORMAL; break;
+			}
+			rh_variable_to_int(ctx, var, &i);
+			if (!i) break;
+			ctx->token = token;
+		}
+	} else if (token_cmp_skip(ctx, "for")) {
+		token_cmp_error_skip(ctx, "(");
+		var = rh_execute_expression(ctx, execMode, 0);
+		rh_variable_to_int(ctx, var, &i);
+		token_cmp_error_skip(ctx, ";");
+		token = ctx->token;
+		for (;;) {
+			var = rh_execute_expression(ctx, execMode, 0);
+			rh_variable_to_int(ctx, var, &i);
+			token_cmp_error_skip(ctx, ";");
+			token1 = ctx->token;
+			rh_execute_expression(ctx, EM_DISABLED, 0);
+			token_cmp_error_skip(ctx, ")");
+			res = rh_execute_statement(ctx, execMode);
+			if (execMode == EM_DISABLED || !i || res == SR_BREAK) {
+				res = SR_NORMAL; break;
+			} else if (res == SR_RETURN) break;
+			ctx->token = token1;
+			rh_execute_expression(ctx, execMode, 0);
+			ctx->token = token;
+		}
+		needsSemicolon = 0;
+	} else if (token_cmp_skip(ctx, "{")) {
+		rh_variable *varTop = ctx->variable;
+		while (ctx->token != NULL && !token_cmp(ctx->token, "}")) {
+			res = rh_execute_statement(ctx, execMode);
+			if (execMode == EM_ENABLED && res != SR_NORMAL) execMode = EM_DISABLED;
+		}
+		token_cmp_error_skip(ctx, "}");
+		while (ctx->variable == varTop) {
+			rh_variable *tmpVar = ctx->variable;
+			ctx->variable = tmpVar->next;
+			rh_free_variable(tmpVar);
+		}
+		needsSemicolon = 0;
+	} else if (token_cmp(ctx, ";"));
+	else if (token_cmp_skip(ctx, "break")) res = SR_BREAK;
+	else if (token_cmp_skip(ctx, "continue")) res = SR_CONTINUE;
+	else if (token_cmp_skip(ctx, "return")) res = SR_RETURN;
+	else {
+		rh_type *type = read_type_speifier(ctx, execMode);
+		if (type != NULL) {
+			do {
+				rh_token *idToken;
+				rh_type *sType = read_type_declarator(ctx, type, &idToken, 1, execMode);
+				if (type != NULL) {
+					if (execMode == EM_ENABLED) {
+						rh_variable *var = rh_init_variable(ctx);
+						var->token = idToken;
+						var->type = sType;
+						var->is_left = 1;
+						var->next = ctx->variable;
+						ctx->variable = var;
+					}
+				} else {
+					E_ERROR(ctx, "Variable decl err.");
+				}
+			} while (ctx->token != NULL && token_cmp_skip(ctx, ","));
+		} else {
+			rh_variable *var = rh_execute_expression(ctx, execMode, 0);
+			printf("RESULT:\n");
+			rh_dump_variable(var);
+		}
 	}
-
+	if (needsSemicolon) token_cmp_error_skip(ctx, ";");
 	return SR_NORMAL;
 }
 
 int rh_execute(rh_context *ctx) {
+	while (ctx->token != NULL) {
+		rh_execute_statement(ctx, EM_ENABLED);
+	}
+	/*
 	rh_variable *var = rh_execute_expression(ctx, EM_ENABLED, 0);
 	printf("RESULT:\n");
 	rh_dump_variable(var);
+	*/
 	return 0;
 }
 

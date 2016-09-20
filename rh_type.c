@@ -49,10 +49,6 @@ int rh_get_typesize(rh_type *type) {
 	return type->size;
 }
 
-int rh_variable_to_int(rh_context *ctx, rh_variable *var) {
-	return (int) *(long long *) var->memory;
-}
-
 rh_variable *rh_convert_type(rh_context ctx, rh_variable *var, int force) {
 	return NULL;
 }
