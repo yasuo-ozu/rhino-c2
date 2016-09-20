@@ -401,6 +401,7 @@ rh_type *read_type_declarator(rh_context *ctx, rh_type *parent, rh_token **pToke
 		int i;
 		rh_variable_to_int(ctx, var, &i);
 		rh_free_variable(var);
+		type->kind = RHTYP_ARRAY;
 		type->length = i;
 		type->child = ret;
 		type->size = ret->size * i;
@@ -499,7 +500,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 				rh_token *idToken;
 				rh_type *sType = read_type_declarator(ctx, type, &idToken, 1, execMode);
 				if (sType != NULL) {
-					rh_variable *var, *var2;
+					rh_variable *var, *var2, *var3;
 					for (var = ctx->variable; var != ctx->variable_top; var = var->next) {
 						if (strcmp(var->token->text, idToken->text) == 0) {
 							E_ERROR(ctx, "The name '%s' is already in use.", idToken->text);
@@ -511,8 +512,38 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 						var->is_left = 1;
 					}
 					if (token_cmp_skip(ctx, "=")) {
-						var2 = rh_execute_expression(ctx, execMode, 1);
-						if (execMode == EM_ENABLED) rh_assign_variable(ctx, var, var2);
+						if (token_cmp_skip(ctx, "{")) {
+							int nest = 0;
+							if (sType->kind != RHTYP_POINTER && sType->kind != RHTYP_ARRAY) {
+								E_ERROR(ctx, "variable initialize error");
+							}
+							(*(int *)var->memory) = ctx->hp;
+							while (ctx->token != NULL) {
+								if (token_cmp_skip(ctx, "{")) nest++;
+								else if (token_cmp_skip(ctx, "}")) {
+									nest--;
+									if (nest == 0) break;
+								} else {
+									var2 = rh_execute_expression(ctx, execMode, 1);
+									if (execMode == EM_ENABLED) {
+										var3 = rh_convert_variable(ctx, var2, sType->child, 0);	// TODO: 多次元配列に対応
+										rh_free_variable(var2);
+										memcpy(ctx->memory + ctx->hp, var3->memory, sType->child->size);
+										rh_free_variable(var3);
+										ctx->hp += sType->child->size;
+									}
+									if (nest == 0) {
+										if (token_cmp_skip(ctx, "}")) break;
+									}
+									token_cmp_error_skip(ctx, ",");
+								}
+							}
+							// TODO: 配列の添字分にみたない分0を詰める
+
+						} else {
+							var2 = rh_execute_expression(ctx, execMode, 1);
+							if (execMode == EM_ENABLED) rh_assign_variable(ctx, var, var2);
+						}
 					}
 					if (execMode == EM_ENABLED) {
 						var->next = ctx->variable;

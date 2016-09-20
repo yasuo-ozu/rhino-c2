@@ -21,6 +21,39 @@ void rh_free_variable(rh_variable *var) {
 	rh_free(var);
 }
 
+void rh_dump_variable_internal(rh_context *ctx, unsigned char *mem, rh_type *type) {
+	if (type->kind == RHTYP_NUMERIC) {
+		long long intval = 0;
+		memcpy(&intval, mem, rh_get_typesize(type));
+		if (type->size == 1) printf("'%c' ", (char) intval);
+		printf("%d ", (int) intval);
+	} else if (type->kind == RHTYP_POINTER) {
+		long long intval = 0;
+		memcpy(&intval, mem, rh_get_typesize(type));
+		printf("<%d> ", (int) intval);
+		if (type->kind == RHTYP_POINTER && type->child->kind == RHTYP_NUMERIC && type->child->size == 1) {
+			printf("\"%s\" ", ctx->memory + intval);
+		} else {
+			rh_dump_variable_internal(ctx, mem, type->child);
+		}
+	} else if (type->kind == RHTYP_ARRAY) {
+		long long intval = 0;
+		memcpy(&intval, mem, rh_get_typesize(type));
+		printf("<%d> {", (int) intval);
+		for (int i = 0; i < type->length; i++) {
+			if (i > 0) printf(", ");
+			rh_dump_variable_internal(ctx, ctx->memory + intval + i * type->child->size, type->child);
+		}
+		printf("} ");
+	} else if (type->kind == RHTYP_FLOATING) {
+		double dblval = 0;
+		if (type->size == 16) dblval = (double) *(long double *) mem;
+		if (type->size == 8) dblval = (double) *(double *) mem;
+		if (type->size == 4) dblval = (double) *(float *) mem;
+		printf("%lf ", dblval);
+	}
+}
+
 void rh_dump_variable(rh_context *ctx, rh_variable *var) {
 	if (var == NULL) {
 		printf("NULL\n");
@@ -29,20 +62,8 @@ void rh_dump_variable(rh_context *ctx, rh_variable *var) {
 	printf("(");
 	rh_dump_type(var->type);
 	printf(") ");
-	if (var->type->kind == RHTYP_NUMERIC || var->type->kind == RHTYP_POINTER) {
-		long long intval = 0;
-		memcpy(&intval, var->memory, rh_get_typesize(var->type));
-		if (var->type->kind == RHTYP_POINTER && var->type->child->kind == RHTYP_NUMERIC && var->type->child->size == 1) {
-			printf("\"%s\" ", ctx->memory + intval);
-		}
-		printf("%d\n", (int) intval);
-	} else if (var->type->kind == RHTYP_FLOATING) {
-		double dblval = 0;
-		if (var->type->size == 16) dblval = (double) *(long double *) var->memory;
-		if (var->type->size == 8) dblval = (double) *(double *) var->memory;
-		if (var->type->size == 4) dblval = (double) *(float *) var->memory;
-		printf("%lf\n", dblval);
-	}
+	rh_dump_variable_internal(ctx, var->memory, var->type);
+	printf("\n");
 }
 
 rh_variable *rh_search_variable(rh_context *ctx, char *ident) {
