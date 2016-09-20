@@ -16,7 +16,7 @@ struct rh_context {
 	rh_file *file;
 	unsigned char *memory;
 	int hp, sp;
-	rh_variable *variable;
+	rh_variable *variable, *variable_top;
 	rh_token *token;
 	struct {
 		char *messages[20];

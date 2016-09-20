@@ -69,6 +69,8 @@ int rh_main(int argc, char **argv) {
 	ctx->hp = 0;
 	ctx->sp = RH_MEMORY_SIZE - 1;
 	ctx->token = NULL;
+	ctx->variable = NULL;
+	ctx->variable_top = NULL;
 
 	rh_token *token, *token_top = NULL;
 	while ((token = rh_next_token(ctx)) != NULL) {

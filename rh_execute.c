@@ -476,17 +476,19 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		}
 		needsSemicolon = 0;
 	} else if (token_cmp_skip(ctx, "{")) {
-		rh_variable *varTop = ctx->variable;
+		rh_variable *varTop = ctx->variable_top;
+		ctx->variable_top = ctx->variable;
 		while (ctx->token != NULL && !token_cmp(ctx->token, "}")) {
 			res = rh_execute_statement(ctx, execMode);
 			if (execMode == EM_ENABLED && res != SR_NORMAL) execMode = EM_DISABLED;
 		}
 		token_cmp_error_skip(ctx, "}");
-		while (ctx->variable != varTop) {
+		while (ctx->variable != ctx->variable_top) {
 			rh_variable *tmpVar = ctx->variable;
 			ctx->variable = tmpVar->next;
 			rh_free_variable(tmpVar);
 		}
+		ctx->variable_top = varTop;
 		needsSemicolon = 0;
 	} else if (token_cmp(ctx->token, ";"));
 	else if (token_cmp_skip(ctx, "break")) res = SR_BREAK;
@@ -498,8 +500,13 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			do {
 				rh_token *idToken;
 				rh_type *sType = read_type_declarator(ctx, type, &idToken, 1, execMode);
-				if (type != NULL) {
+				if (sType != NULL) {
 					rh_variable *var, *var2;
+					for (var = ctx->variable; var != ctx->variable_top; var = var->next) {
+						if (strcmp(var->token->text, idToken->text) == 0) {
+							E_ERROR(ctx, "The name '%s' is already in use.", idToken->text);
+						}
+					}
 					if (execMode == EM_ENABLED) {
 						var = rh_init_variable(sType);	// TODO: スタックに確保する
 						var->token = idToken;
