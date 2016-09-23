@@ -30,7 +30,8 @@ int get_priority(rh_token *token, rh_operator_type type) {
 	static struct {
 		char *symbol; int priority; int type;
 	} priority_table[] = {
-		{"++", 1, OP_POSTFIX}, {"--", 1, OP_POSTFIX}, {"++", 2, OP_PREFIX}, {"--", 2, OP_PREFIX}, {"+", 2, OP_PREFIX},
+		{"[", 1, OP_POSTFIX}, {"++", 1, OP_POSTFIX}, {"--", 1, OP_POSTFIX}, 
+		{"++", 2, OP_PREFIX}, {"--", 2, OP_PREFIX}, {"+", 2, OP_PREFIX},
 		{"-", 2, OP_PREFIX}, {"~", 2, OP_PREFIX}, {"!", 2, OP_PREFIX}, {"*", 4, OP_BINARY}, {"/", 4, OP_BINARY},
 		{"%", 4, OP_BINARY}, {"+", 5, OP_BINARY}, {"-", 5, OP_BINARY}, {"<<", 6, OP_BINARY}, {">>", 6, OP_BINARY},
 		{"<", 7, OP_BINARY}, {"<=", 7, OP_BINARY}, {">", 7, OP_BINARY}, {">=", 7, OP_BINARY}, {"==", 8, OP_BINARY},
@@ -332,9 +333,27 @@ rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_ex
 				}
 				while (get_priority(ctx->token, OP_POSTFIX) == priority) {
 					if (isVector && token_cmp(ctx->token, ",")) break;
-					token1 = ctx->token;
-					if (token_cmp_skip(ctx, "++") || token_cmp_skip(ctx, "--"))
-						if (execMode == EM_ENABLED) ret = rh_execute_calculation_post(ctx, ret, token1);
+					if (token_cmp_skip(ctx, "[")) {
+						rh_variable *indexVal = rh_execute_expression(ctx, execMode, 1);
+						token_cmp_error_skip(ctx, "]");
+						if (execMode == EM_ENABLED) {
+							int i, j;
+							if (ret == NULL || !rh_variable_to_int(ctx, indexVal, &i) || i >= ret->type->length) {
+								E_ERROR(ctx, "array iterator error");
+							} else {
+								memcpy(&j, ret->memory, ret->type->size);
+								var = rh_init_variable(NULL);
+								var->type = ret->type->child;
+								var->memory = ctx->memory + j + var->type->size * i;
+								rh_free_variable(ret);
+								ret = var;
+							}
+						}
+					} else {
+						token1 = ctx->token;
+						if (token_cmp_skip(ctx, "++") || token_cmp_skip(ctx, "--"))
+							if (execMode == EM_ENABLED) ret = rh_execute_calculation_post(ctx, ret, token1);
+					}
 				}
 			}
 		}
@@ -454,13 +473,12 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		}
 	} else if (token_cmp_skip(ctx, "for")) {
 		token_cmp_error_skip(ctx, "(");
-		var = rh_execute_expression(ctx, execMode, 0);
-		rh_variable_to_int(ctx, var, &i);
+		rh_execute_expression(ctx, execMode, 0);
 		token_cmp_error_skip(ctx, ";");
 		token = ctx->token;
 		for (;;) {
 			var = rh_execute_expression(ctx, execMode, 0);
-			rh_variable_to_int(ctx, var, &i);
+			if (execMode == EM_ENABLED) rh_variable_to_int(ctx, var, &i);
 			token_cmp_error_skip(ctx, ";");
 			token1 = ctx->token;
 			rh_execute_expression(ctx, EM_DISABLED, 0);
