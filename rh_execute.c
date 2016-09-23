@@ -478,7 +478,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		token = ctx->token;
 		for (;;) {
 			var = rh_execute_expression(ctx, execMode, 0);
-			if (execMode == EM_ENABLED) rh_variable_to_int(ctx, var, &i);
+			rh_variable_to_int(ctx, var, &i);
 			token_cmp_error_skip(ctx, ";");
 			token1 = ctx->token;
 			rh_execute_expression(ctx, EM_DISABLED, 0);

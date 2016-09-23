@@ -111,6 +111,7 @@ rh_variable *rh_convert_variable(rh_context *ctx, rh_variable *var, rh_type *typ
 }
 
 int rh_variable_to_int(rh_context *ctx, rh_variable *var, int *intval) {
+	if (var == NULL) return 0;
 	rh_type *type = rh_init_type();
 	type->size = 4; type->sign = 1; type->kind = RHTYP_NUMERIC;
 	rh_variable *ret = rh_convert_variable(ctx, var, type, 0);
