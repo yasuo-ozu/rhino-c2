@@ -193,11 +193,8 @@ void rh_next_token_literal(rh_context *ctx, char c, rh_token *token) {
 				c = (char) val;
 			}
 		}
-		if (a == '"') {
-			ctx->memory[hp + count] = c;
-		} else {
-			cval = (cval << 8) + c;
-		}
+		if (a == '"') ctx->memory[hp + count] = c;
+		else cval = (cval << 8) + c;
 		count++;
 	}
 	if (a == '\'' && count > 1) type->size = 4;

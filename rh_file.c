@@ -73,7 +73,7 @@ char rh_getc0(rh_context *ctx) {
 		c = fgetc(fp);
 		if (c == '?') {
 			c = fgetc(fp);
-			if (c == '=') c = '#';
+			if      (c == '=') c = '#';
 			else if (c == '(') c = '[';
 			else if (c == '/') c = '\\';
 			else if (c == ')') c = ']';
@@ -102,6 +102,18 @@ char rh_getc(rh_context *ctx) {
 		if (c == '\r' || c == '\n') {
 			if (c == '\r') c = rh_getc0(ctx);
 			if (c == '\n') c = rh_getc0(ctx);
+		} else if (c == 'u' || c == 'U') {
+			int i = c == 'u' ? 4 : 8, val = 0;
+			while (i-- > 0) {
+				c = rh_getc0(ctx);
+				if      ('0' <= c && c <= '9') val = val * 16 + (c - '0');
+				else if ('a' <= c && c <= 'f') val = val * 16 + (c - 'a' + 10);
+				else if ('A' <= c && c <= 'F') val = val * 16 + (c - 'A' + 10);
+				else {
+					E_ERROR(ctx, "Universal char name error");
+				}
+			}
+			c = (char) val;	// TODO: ユニバーサル文字名の正しい取扱い
 		} else {
 			rh_ungetc(ctx, c);
 			c = '\\';
