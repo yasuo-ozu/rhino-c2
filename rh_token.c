@@ -105,7 +105,7 @@ void rh_next_token_numdbl(rh_context *ctx, char c, rh_token *token) {
 			(!isHex && (c == 'E' || c == 'e'))) {
 		if (!isDbl) isDbl = 1, dblval = (long double) intval;
 		c = rh_getchar(ctx);
-		double power = c == '-' ? 0.1 : 1.0;
+		double power = c == '-' ? 0.1 : 10.0;
 		if (c == '+' || c == '-') c = rh_getchar(ctx);
 		if ('0' <= c && c <= '9') {
 			int p = 0;
