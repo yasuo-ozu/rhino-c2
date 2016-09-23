@@ -493,11 +493,12 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		}
 		needsSemicolon = 0;
 	} else if (token_cmp_skip(ctx, "{")) {
+		rh_statement_result res2;
 		rh_variable *varTop = ctx->variable_top;
 		ctx->variable_top = ctx->variable;
 		while (ctx->token != NULL && !token_cmp(ctx->token, "}")) {
-			res = rh_execute_statement(ctx, execMode);
-			if (execMode == EM_ENABLED && res != SR_NORMAL) execMode = EM_DISABLED;
+			res2 = rh_execute_statement(ctx, execMode && res == SR_NORMAL);
+			if (res2 != SR_NORMAL) res = res2;
 		}
 		token_cmp_error_skip(ctx, "}");
 		while (ctx->variable != ctx->variable_top) {
@@ -508,9 +509,9 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		ctx->variable_top = varTop;
 		needsSemicolon = 0;
 	} else if (token_cmp(ctx->token, ";"));
-	else if (token_cmp_skip(ctx, "break")) res = SR_BREAK;
-	else if (token_cmp_skip(ctx, "continue")) res = SR_CONTINUE;
-	else if (token_cmp_skip(ctx, "return")) res = SR_RETURN;
+	else if (token_cmp_skip(ctx, "break"))   { if (execMode == EM_ENABLED) res = SR_BREAK;    }
+	else if (token_cmp_skip(ctx, "continue")){ if (execMode == EM_ENABLED) res = SR_CONTINUE; }
+	else if (token_cmp_skip(ctx, "return"))  { if (execMode == EM_ENABLED) res = SR_RETURN;   }
 	else {
 		rh_type *type = read_type_speifier(ctx, execMode);
 		if (type != NULL) {
@@ -580,7 +581,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		}
 	}
 	if (needsSemicolon) token_cmp_error_skip(ctx, ";");
-	return SR_NORMAL;
+	return res;
 }
 
 int rh_execute(rh_context *ctx) {
