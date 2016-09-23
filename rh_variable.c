@@ -5,17 +5,19 @@ rh_variable *rh_init_variable(rh_type *type) {
 	var->token = NULL;
 	var->type = type;
 	var->memory = NULL;
+	var->address = -2;
 	var->next = NULL;
 	var->is_dynamic = 0;
 	var->is_left = 0;
 	if (type != NULL) {
 		var->memory = rh_malloc(rh_get_typesize(type));
+		var->address = -1;
 	}
 	return var;
 }
 
 void rh_free_variable(rh_variable *var) {
-	if (var->is_dynamic && var->memory != NULL) {
+	if (var->address == -1 && var->memory != NULL) {
 		rh_free(var->memory);
 	}
 	rh_free(var);
@@ -26,7 +28,7 @@ void rh_dump_variable_internal(rh_context *ctx, unsigned char *mem, rh_type *typ
 		long long intval = 0;
 		memcpy(&intval, mem, rh_get_typesize(type));
 		if (type->size == 1) printf("'%c' ", (char) intval);
-		printf("%d ", (int) intval);
+		printf("%d", (int) intval);
 	} else if (type->kind == RHTYP_POINTER) {
 		long long intval = 0;
 		memcpy(&intval, mem, rh_get_typesize(type));
@@ -42,7 +44,7 @@ void rh_dump_variable_internal(rh_context *ctx, unsigned char *mem, rh_type *typ
 		printf("<%d> {", (int) intval);
 		for (int i = 0; i < type->length; i++) {
 			if (i > 0) printf(", ");
-			rh_dump_variable_internal(ctx, ctx->memory + intval + i * type->child->size, type->child);
+			rh_dump_variable_internal(ctx, ctx->memory + (int) intval + i * type->child->size, type->child);
 		}
 		printf("} ");
 	} else if (type->kind == RHTYP_FLOATING) {

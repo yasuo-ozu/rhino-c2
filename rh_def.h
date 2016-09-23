@@ -66,6 +66,7 @@ struct rh_variable {
 	rh_token *token;	///< Assigned when table entry
 	rh_type *type;
 	unsigned char *memory;
+	int address;		///< -1 when malloc()
 	rh_variable *next;	///< Used when table entry
 	int is_dynamic;		///< Set when *memory is malloced.
 	int is_left;

@@ -31,12 +31,12 @@ int get_priority(rh_token *token, rh_operator_type type) {
 		char *symbol; int priority; int type;
 	} priority_table[] = {
 		{"[", 1, OP_POSTFIX}, {"++", 1, OP_POSTFIX}, {"--", 1, OP_POSTFIX}, 
-		{"++", 2, OP_PREFIX}, {"--", 2, OP_PREFIX}, {"+", 2, OP_PREFIX},
+		{"++", 2, OP_PREFIX}, {"--", 2, OP_PREFIX}, {"+", 2, OP_PREFIX}, {"*", 2, OP_PREFIX}, {"&", 2, OP_PREFIX},
 		{"-", 2, OP_PREFIX}, {"~", 2, OP_PREFIX}, {"!", 2, OP_PREFIX}, {"*", 4, OP_BINARY}, {"/", 4, OP_BINARY},
 		{"%", 4, OP_BINARY}, {"+", 5, OP_BINARY}, {"-", 5, OP_BINARY}, {"<<", 6, OP_BINARY}, {">>", 6, OP_BINARY},
 		{"<", 7, OP_BINARY}, {"<=", 7, OP_BINARY}, {">", 7, OP_BINARY}, {">=", 7, OP_BINARY}, {"==", 8, OP_BINARY},
 		{"!=", 8, OP_BINARY}, {"&", 9, OP_BINARY}, {"^", 10, OP_BINARY}, {"|", 11, OP_BINARY}, {"&&", 12, OP_BINARY},
-		{"&&", 13, OP_BINARY}, {"&&", 14, OP_BINARY}, {"=", 15, OP_BINARY}, {"+=", 15, OP_BINARY}, {"-=", 15, OP_BINARY}, 
+		{"||", 13, OP_BINARY}, {"?", 14, OP_BINARY}, {"=", 15, OP_BINARY}, {"+=", 15, OP_BINARY}, {"-=", 15, OP_BINARY}, 
 		{"*=", 15, OP_BINARY}, {"/=", 15, OP_BINARY}, {"%=", 15, OP_BINARY}, {"<<=", 15, OP_BINARY}, {">>=", 15, OP_BINARY}, 
 		{"&=", 15, OP_BINARY}, {"^=", 15, OP_BINARY}, {"|=", 15, OP_BINARY}, {",", 16, OP_BINARY}, {0, 0, OP_BINARY}
 	};
@@ -113,8 +113,8 @@ int variable_get_long_double(rh_variable *var, long double *dblval) {
 
 rh_variable *rh_execute_calculation_pre(rh_context *ctx, rh_variable *var, rh_token *token) {
 	if (var == NULL) return NULL;
-	rh_type *type = rh_dup_type(var->type);
-	rh_variable *ret = rh_init_variable(type);
+	rh_variable *ret;
+	rh_type *type = var->type;
 	if (var->type->kind == RHTYP_NUMERIC) {
 		long long int1 = 0, int2 = 0;
 		memcpy(&int1, var->memory, type->size);
@@ -126,10 +126,9 @@ rh_variable *rh_execute_calculation_pre(rh_context *ctx, rh_variable *var, rh_to
 		else if (token_cmp(token, "--")) int2 = --int1;
 		else {
 			E_ERROR(ctx, "Operator '%s' error", token->text);
-			rh_free_variable(ret);
-			rh_free_type(type);
 			return NULL;
 		}
+		ret = rh_init_variable(type);
 		memcpy(ret->memory, &int2, type->size);
 		if (token_cmp(token, "++") || token_cmp(token, "--"))
 			memcpy(var->memory, &int1, type->size);
@@ -142,15 +141,37 @@ rh_variable *rh_execute_calculation_pre(rh_context *ctx, rh_variable *var, rh_to
 		else if (token_cmp(token, "!")) dbl2 =  !dbl1;
 		else {
 			E_ERROR(ctx, "Operator '%s' error", token->text);
-			rh_free_variable(ret);
-			rh_free_type(type);
 			return NULL;
 		}
+		ret = rh_init_variable(type);
 		if      (type->size ==  4) (*(float *)			ret->memory) = (float) dbl2;
 		else if (type->size ==  8) (*(double *)			ret->memory) = (double) dbl2;
 		else if (type->size == 16) (*(long double *)	ret->memory) = dbl2;
 		return ret;
+	} else if (var->type->kind == RHTYP_POINTER) {
+		if (token_cmp(token, "*")) {
+			int addr;
+			memcpy(&addr, var->memory, sizeof(int));
+			ret = rh_init_variable(NULL);
+			ret->type = type->child;
+			ret->memory = ctx->memory + addr;
+			ret->address = addr;
+			return ret;
+		} else if (token_cmp(token, "&")) {
+			if (var->address < 0) {
+				E_ERROR(ctx, "pointer error");
+				return NULL;
+			}
+			rh_type *type2 = rh_init_type();
+			type2->kind = RHTYP_POINTER;
+			type2->size = sizeof(int);
+			type->child = type;
+			ret = rh_init_variable(type2);
+			(*(int *)ret->memory) = var->address;
+			return ret;
+		}
 	}
+	E_ERROR(ctx, "pre-op error");
 	return NULL;
 }
 
@@ -261,6 +282,7 @@ rh_variable *rh_execute_calculation_post(rh_context *ctx, rh_variable *var, rh_t
 		memcpy(var->memory, &int1, type->size);
 		return ret;
 	}
+	E_ERROR(ctx, "post-op error");
 	return NULL;
 }
 
@@ -338,14 +360,16 @@ rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_ex
 						token_cmp_error_skip(ctx, "]");
 						if (execMode == EM_ENABLED) {
 							int i, j;
-							if (ret == NULL || !rh_variable_to_int(ctx, indexVal, &i) || i >= ret->type->length) {
+							if (ret == NULL || !rh_variable_to_int(ctx, indexVal, &i)
+									|| !(ret->type->kind == RHTYP_POINTER || ret->type->kind == RHTYP_ARRAY)) {
 								E_ERROR(ctx, "array iterator error");
 							} else {
-								memcpy(&j, ret->memory, ret->type->size);
+								memcpy(&j, ret->memory, sizeof(int));
 								var = rh_init_variable(NULL);
 								var->type = ret->type->child;
 								var->memory = ctx->memory + j + var->type->size * i;
-								rh_free_variable(ret);
+								var->address = j + var->type->size * i;
+								//rh_free_variable(ret);
 								ret = var;
 							}
 						}
@@ -393,6 +417,7 @@ rh_type *read_type_speifier(rh_context *ctx, rh_execute_mode execMode) {
 
 rh_type *read_type_declarator(rh_context *ctx, rh_type *parent, rh_token **pToken, int identMode, rh_execute_mode execMode) {
 	rh_type *ret = NULL;
+	rh_variable *var = NULL;
 	if (token_cmp_skip(ctx, "(")) {
 		ret = read_type_declarator(ctx, parent, pToken, identMode, execMode);
 		token_cmp_error_skip(ctx, ")");
@@ -413,17 +438,22 @@ rh_type *read_type_declarator(rh_context *ctx, rh_type *parent, rh_token **pToke
 		}
 	}
 	while (token_cmp_skip(ctx, "[")) {
-		rh_variable *var = rh_execute_expression(ctx, execMode, 1);
+		if (!token_cmp(ctx->token, "]"))
+			var = rh_execute_expression(ctx, execMode, 1);
 		token_cmp_error_skip(ctx, "]");
 		if (execMode == EM_DISABLED) return NULL;
 		rh_type *type = rh_init_type();
 		int i;
-		rh_variable_to_int(ctx, var, &i);
-		rh_free_variable(var);
+		if (var != NULL) {
+			rh_variable_to_int(ctx, var, &i);
+			rh_free_variable(var);
+			type->length = i;
+			type->size = ret->size * i;
+		} else {
+			type->length = -1;
+		}
 		type->kind = RHTYP_ARRAY;
-		type->length = i;
 		type->child = ret;
-		type->size = ret->size * i;
 		ret = type;
 	}
 	return ret;
@@ -432,6 +462,38 @@ rh_type *read_type_declarator(rh_context *ctx, rh_type *parent, rh_token **pToke
 typedef enum {
 	SR_NORMAL = 0, SR_RETURN, SR_CONTINUE, SR_BREAK
 } rh_statement_result;
+
+int execute_brace_initializer(rh_context *ctx, rh_type *type, rh_execute_mode execMode) {
+	if (type->kind == RHTYP_POINTER || type->kind == RHTYP_ARRAY) {
+		int i = 0, count = -1, nest = 0, size = rh_get_typesize(type->child);
+		rh_variable *baseVar = rh_init_variable(NULL), *var2;
+		baseVar->type = type->child;
+		if (type->kind == RHTYP_ARRAY) count = type->length;
+		do {
+			if (token_cmp_skip(ctx, "{")) {
+				if (!execute_brace_initializer(ctx, type->child, execMode)) nest++;
+			} else if (token_cmp(ctx->token, "}")) {
+				if (--nest < 0) break;
+				token_next(ctx);
+			} else {
+				var2 = rh_execute_expression(ctx, execMode, 1);
+				if ((count == -1 || i < count) && execMode == EM_ENABLED) {
+					baseVar->memory = ctx->memory + ctx->hp;
+					rh_assign_variable(ctx, baseVar, var2);
+					ctx->hp += size; i++;
+				}
+			}
+		} while (token_cmp_skip(ctx, ","));
+		token_cmp_error_skip(ctx, "}");
+		while (count != -1 && i < count) {
+			memset(ctx->memory + ctx->hp, 0, size);
+			ctx->hp += size; i++;
+		}
+		if (count == -1 && type->kind == RHTYP_ARRAY) type->length = i;
+		return 1;
+	}
+	return 0;
+}
 
 rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMode) {
 	int needsSemicolon = 1, i;
@@ -526,44 +588,45 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 						}
 					}
 					if (execMode == EM_ENABLED) {
-						var = rh_init_variable(sType);	// TODO: スタックに確保する
+						var = rh_init_variable(NULL);	// TODO: 関数内ではスタックに確保する
+						var->type = sType;
 						var->token = idToken;
 						var->is_left = 1;
+						if (sType->kind == RHTYP_ARRAY) {
+							var->address = -1;
+							var->memory = rh_malloc(sizeof(int));	///< 配列が確保される先の仮想アドレスが入る
+							(*(int *)var->memory) = ctx->hp;
+						} else {
+							var->address = ctx->hp;
+							var->memory = ctx->memory + ctx->hp;
+							ctx->hp += sType->size;
+						}
 					}
 					if (token_cmp_skip(ctx, "=")) {
 						if (token_cmp_skip(ctx, "{")) {
-							int nest = 0;
-							if (sType->kind != RHTYP_POINTER && sType->kind != RHTYP_ARRAY) {
+							if (execMode == EM_ENABLED) {
+								if (sType->kind == RHTYP_POINTER) (*(int *)var->memory) = ctx->hp;
+								else if (sType->kind != RHTYP_ARRAY) ctx->hp -= sType->size;
+							}
+							if (!execute_brace_initializer(ctx, sType, execMode)) {
 								E_ERROR(ctx, "variable initialize error");
 							}
-							(*(int *)var->memory) = ctx->hp;
-							while (ctx->token != NULL) {
-								if (token_cmp_skip(ctx, "{")) nest++;
-								else if (token_cmp_skip(ctx, "}")) {
-									nest--;
-									if (nest == 0) break;
-								} else {
-									var2 = rh_execute_expression(ctx, execMode, 1);
-									if (execMode == EM_ENABLED) {
-										var3 = rh_convert_variable(ctx, var2, sType->child, 0);	// TODO: 多次元配列に対応
-										rh_free_variable(var2);
-										memcpy(ctx->memory + ctx->hp, var3->memory, sType->child->size);
-										rh_free_variable(var3);
-										ctx->hp += sType->child->size;
-									}
-									if (nest == 0) {
-										if (token_cmp_skip(ctx, "}")) break;
-									}
-									token_cmp_error_skip(ctx, ",");
-								}
-							}
-							// TODO: 配列の添字分にみたない分0を詰める
-
 						} else {
 							var2 = rh_execute_expression(ctx, execMode, 1);
-							if (execMode == EM_ENABLED) rh_assign_variable(ctx, var, var2);
+							if (execMode == EM_ENABLED){
+								rh_assign_variable(ctx, var, var2);
+							}
+						}
+					} else {
+						if (execMode == EM_ENABLED) {
+							memset(var->memory, 0, sType->size);
 						}
 					}
+					if (sType == RHTYP_ARRAY && sType->length == -1) {
+						E_ERROR(ctx, "length error");
+						sType->length = 1;
+					}
+					sType->size = rh_get_typesize(sType);
 					if (execMode == EM_ENABLED) {
 						var->next = ctx->variable;
 						ctx->variable = var;
