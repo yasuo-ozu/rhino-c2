@@ -162,11 +162,36 @@ void rh_next_token_literal(rh_context *ctx, char c, rh_token *token) {
 	while ((c = rh_getchar(ctx)) != a) {
 		if (c == '\n' || c == '\0') {
 			E_ERROR(ctx, "Literal reached end of line.");
+			break;
 		} else if (c == '\\') {
 			c = rh_getchar(ctx);
-			if (c == 'n') c = '\n';
+			if      (c == 'n') c = '\n';
 			else if (c == 't') c = '\t';
+			else if (c == 'v') c = '\v';
+			else if (c == 'b') c = '\b';
 			else if (c == 'r') c = '\r';
+			else if (c == 'f') c = '\f';
+			else if (c == 'a') c = '\a';
+			else if (c == 'x') {
+				int val = 0;
+				for (;;) {
+					c = rh_getchar(ctx);
+					if      ('0' <= c && c <= '9') val = val * 16 + (c - '0');
+					else if ('a' <= c && c <= 'f') val = val * 16 + (c - 'a' + 10);
+					else if ('A' <= c && c <= 'F') val = val * 16 + (c - 'A' + 10);
+					else break;
+				}
+				rh_ungetc(ctx, c);
+				c = (char) val;
+			} else if ('0' <= c && c <= '9') {
+				int val = 0;
+				while ('0' <= c && c <= '7') {
+					val = val * 8 + (c - '0');
+					c = rh_getchar(ctx);
+				}
+				rh_ungetc(ctx, c);
+				c = (char) val;
+			}
 		}
 		if (a == '"') {
 			ctx->memory[hp + count] = c;
