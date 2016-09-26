@@ -401,7 +401,16 @@ rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_ex
 }
 
 rh_variable *rh_execute_expression(rh_context *ctx, rh_execute_mode execMode, int isVector) {
-	return rh_execute_expression_internal(ctx, 16, execMode, isVector);
+	rh_variable *res = NULL;
+	rh_token *token = token_fetch(ctx), *token0 = token;
+	if (token->child[1] != NULL && execMode == EM_DISABLED) {
+		ctx->token = token->child[1];
+		return NULL;
+	}
+	res = rh_execute_expression_internal(ctx, 16, execMode, isVector);
+	token = token_fetch(ctx);
+	token0->child[1] = token;
+	return res;
 }
 
 rh_type *read_type_speifier(rh_context *ctx, rh_execute_mode execMode) {
@@ -517,52 +526,56 @@ rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode e
 	for (var = ctx->variable; var != ctx->variable_top; var = var->next) {
 		if (strcmp(var->token->text, idToken->text) == 0) {
 			E_ERROR(ctx, "The name '%s' is already in use.", idToken->text);
-			return res;
+			execMode = EM_DISABLED;
 		}
 	}
-	if (execMode == EM_ENABLED) {
-		var = rh_init_variable(NULL);	// TODO: 関数内ではスタックに確保する
-		var->type = type;
-		var->token = idToken;
-		var->is_left = 1;
-		if (type->kind == RHTYP_ARRAY) {
-			var->address = -1;
-			var->memory = rh_malloc(sizeof(int));	///< 配列が確保される先の仮想アドレスが入る
-			(*(int *)var->memory) = ctx->hp;
-		} else {
-			var->address = ctx->hp;
-			var->memory = ctx->memory + ctx->hp;
-			ctx->hp += type->size;
-		}
-	}
-	if (token_cmp_skip(ctx, "=")) {
-		if (token_cmp_skip(ctx, "{")) {
-			if (execMode == EM_ENABLED) {
-				if (type->kind == RHTYP_POINTER) (*(int *)var->memory) = ctx->hp;
-				else if (type->kind != RHTYP_ARRAY) ctx->hp -= type->size;
-			}
-			if (!execute_brace_initializer(ctx, type, execMode)) {
-				E_ERROR(ctx, "variable initialize error");
-			}
-		} else {
-			var2 = rh_execute_expression(ctx, execMode, 1);
-			if (execMode == EM_ENABLED){
-				rh_assign_variable(ctx, var, var2);
-			}
-		}
+	if (token_cmp_skip(ctx, "(")) {
+		
 	} else {
 		if (execMode == EM_ENABLED) {
-			memset(var->memory, 0, type->size);
+			var = rh_init_variable(NULL);	// TODO: 関数内ではスタックに確保する
+			var->type = type;
+			var->token = idToken;
+			var->is_left = 1;
+			if (type->kind == RHTYP_ARRAY) {
+				var->address = -1;
+				var->memory = rh_malloc(sizeof(int));	///< 配列が確保される先の仮想アドレスが入る
+				(*(int *)var->memory) = ctx->hp;
+			} else {
+				var->address = ctx->hp;
+				var->memory = ctx->memory + ctx->hp;
+				ctx->hp += type->size;
+			}
 		}
-	}
-	if (type->kind == RHTYP_ARRAY && type->length == -1) {
-		E_ERROR(ctx, "length error");
-		type->length = 1;
-	}
-	type->size = rh_get_typesize(type);
-	if (execMode == EM_ENABLED) {
-		var->next = ctx->variable;
-		ctx->variable = var;
+		if (token_cmp_skip(ctx, "=")) {
+			if (token_cmp_skip(ctx, "{")) {
+				if (execMode == EM_ENABLED) {
+					if (type->kind == RHTYP_POINTER) (*(int *)var->memory) = ctx->hp;
+					else if (type->kind != RHTYP_ARRAY) ctx->hp -= type->size;
+				}
+				if (!execute_brace_initializer(ctx, type, execMode)) {
+					E_ERROR(ctx, "variable initialize error");
+				}
+			} else {
+				var2 = rh_execute_expression(ctx, execMode, 1);
+				if (execMode == EM_ENABLED){
+					rh_assign_variable(ctx, var, var2);
+				}
+			}
+		} else {
+			if (execMode == EM_ENABLED) {
+				memset(var->memory, 0, type->size);
+			}
+		}
+		if (type->kind == RHTYP_ARRAY && type->length == -1) {
+			E_ERROR(ctx, "length error");
+			type->length = 1;
+		}
+		type->size = rh_get_typesize(type);
+		if (execMode == EM_ENABLED) {
+			var->next = ctx->variable;
+			ctx->variable = var;
+		}
 	}
 	return res;
 }
@@ -570,8 +583,12 @@ rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode e
 rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMode) {
 	int needsSemicolon = 1, i;
 	rh_statement_result res = SR_NORMAL;
-	rh_token *token = token_fetch(ctx), *token0, *token1;
+	rh_token *token = token_fetch(ctx), *token0 = token, *token1;
 	rh_variable *var;
+	if (token->child[0] != NULL && execMode == EM_DISABLED) {
+		ctx->token = token->child[0];
+		return res;
+	}
 	if (token_cmp_skip(ctx, "if")) {
 		var = expression_with_paren(ctx, execMode);
 		rh_variable_to_int(ctx, var, &i);
@@ -609,7 +626,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		token_cmp_error_skip(ctx, "(");
 		rh_execute_expression(ctx, execMode, 0);
 		token_cmp_error_skip(ctx, ";");
-		token0 = token_fetch(ctx);
+		rh_token *token2 = token_fetch(ctx);
 		for (;;) {
 			var = rh_execute_expression(ctx, execMode, 0);
 			rh_variable_to_int(ctx, var, &i);
@@ -623,7 +640,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			} else if (res == SR_RETURN) break;
 			ctx->token = token1;
 			rh_execute_expression(ctx, execMode, 0);
-			ctx->token = token0;
+			ctx->token = token2;
 		}
 		needsSemicolon = 0;
 	} else if (token_cmp_skip(ctx, "{")) {
@@ -668,6 +685,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		}
 	}
 	if (needsSemicolon) token_cmp_error_skip(ctx, ";");
+	token0->child[0] = token_fetch(ctx);
 	return res;
 }
 
