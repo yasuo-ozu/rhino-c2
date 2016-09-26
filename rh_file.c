@@ -54,7 +54,10 @@ char rh_getc0(rh_context *ctx) {
 	rh_file *file = ctx->file;
 	if (file->unget_buf_top)
 		c = file->unget_buf[--file->unget_buf_top];
-	else c = fgetc(file->fp);
+	else {
+		c = fgetc(file->fp);
+		if ((ctx->flag & RHFLAG_INTERACTIVE) && c == '\n') printf("   ");
+	}
 	if (c == -1) c = 0;
 	while (c == 0 && file->parent != NULL) {
 		ctx->file = file->parent;
@@ -198,7 +201,7 @@ char rh_getchar(rh_context *ctx) {
 		rh_getchar_preprocess(ctx);
 		c = ' ';
 	}
-	if (ctx->flag & RHFLAG_DEBUG) putchar(c);
+	// if (ctx->flag & RHFLAG_DEBUG) putchar(c);
 	return c;
 }
 

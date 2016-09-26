@@ -654,8 +654,8 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			} while (token_fetch(ctx) != NULL && token_cmp_skip(ctx, ","));
 		} else {
 			rh_variable *var = rh_execute_expression(ctx, execMode, 0);
-			if (execMode == EM_ENABLED) {
-				printf("RESULT:\n");
+			if (execMode == EM_ENABLED && (ctx->flag & RHFLAG_INTERACTIVE)) {
+				printf("= ");
 				rh_dump_variable(ctx, var);
 			}
 		}
@@ -665,11 +665,16 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 }
 
 int rh_execute(rh_context *ctx) {
+	if (ctx->flag & RHFLAG_INTERACTIVE) {
+		printf(">> ");
+	}
 	while (token_fetch(ctx) != NULL) {
 		rh_execute_statement(ctx, EM_ENABLED);
-
 		if ((ctx->flag & RHFLAG_INTERACTIVE) && ctx->error.count) {
 			rh_dump_error(ctx);
+		}	
+		if (ctx->flag & RHFLAG_INTERACTIVE) {
+			printf(">> ");
 		}
 	}
 	return 0;
