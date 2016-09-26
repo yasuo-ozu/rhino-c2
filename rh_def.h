@@ -18,6 +18,7 @@ struct rh_context {
 	int hp, sp;
 	rh_variable *variable, *variable_top;
 	rh_token *token;
+	int depth;
 	struct {
 		char *messages[20];
 		int errors;			// counter of ETYPE_ERROR

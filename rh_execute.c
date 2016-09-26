@@ -369,7 +369,6 @@ rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_ex
 								var->type = ret->type->child;
 								var->memory = ctx->memory + j + var->type->size * i;
 								var->address = j + var->type->size * i;
-								//rh_free_variable(ret);
 								ret = var;
 							}
 						}

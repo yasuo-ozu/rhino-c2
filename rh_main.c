@@ -67,10 +67,11 @@ int rh_main(int argc, char **argv) {
 
 	ctx->memory = rh_malloc(RH_MEMORY_SIZE);
 	ctx->hp = 0;
-	ctx->sp = RH_MEMORY_SIZE - 1;
+	ctx->sp = RH_MEMORY_SIZE;
 	ctx->token = NULL;
 	ctx->variable = NULL;
 	ctx->variable_top = NULL;
+	ctx->depth = 0;
 
 	rh_token *token, *token_top = NULL;
 	while ((token = rh_next_token(ctx)) != NULL) {

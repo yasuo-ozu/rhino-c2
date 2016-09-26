@@ -16,6 +16,24 @@ rh_variable *rh_init_variable(rh_type *type) {
 	return var;
 }
 
+rh_variable *rh_init_variable_local(rh_context *ctx, rh_type *type, int depth, int isStatic) {
+	rh_variable *ret = rh_init_variable(NULL);
+	int size = type->size;
+	ret->type = type;
+	if (depth == 0 || isStatic) {
+		ret->memory = ctx->memory + ctx->hp;
+		ret->address = ctx->hp;
+		ctx->hp += size;
+		ctx->hp = (ctx->hp + 7) & 0xFFFFFFF8;
+	} else {
+		ctx->sp -= size;
+		ctx->sp &= 0xFFFFFFF8;
+		ret->memory = ctx->memory + ctx->sp;
+		ret->address = ctx->sp;
+	}
+	return ret;	
+}
+
 void rh_free_variable(rh_variable *var) {
 	if (var->address == -1 && var->memory != NULL) {
 		rh_free(var->memory);
