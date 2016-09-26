@@ -10,6 +10,7 @@ void rh_read_options(rh_context *ctx, int argc, char **argv) {
 			if (*++c == '-') {
 				c++;
 				if (strcmp(c, "dump") == 0) ctx->flag |= RHFLAG_DEBUG; 
+				else if (strcmp(c, "interactive") == 0) ctx->flag |= RHFLAG_INTERACTIVE | RHFLAG_STDIN; 
 				else {
 					E_FATAL(ctx, "unrecognized option %s", c);
 				}
@@ -19,6 +20,7 @@ void rh_read_options(rh_context *ctx, int argc, char **argv) {
 				}
 				for (; *c != '\0'; c++) {
 					if (*c == 'd') ctx->flag |= RHFLAG_DEBUG;
+					else if (*c == 'i') ctx->flag |= RHFLAG_INTERACTIVE | RHFLAG_STDIN;
 					else {
 						E_FATAL(ctx, "unrecognized flag %c", *c);
 					}
@@ -73,22 +75,24 @@ int rh_main(int argc, char **argv) {
 	ctx->variable_top = NULL;
 	ctx->depth = 0;
 
-	rh_token *token, *token_top = NULL;
-	while ((token = rh_next_token(ctx)) != NULL) {
-		if (ctx->flag & RHFLAG_DEBUG) {
-			rh_dump_token(ctx, token);
+	if (!(ctx->flag & RHFLAG_INTERACTIVE)) {
+		rh_token *token, *token_top = NULL;
+		while ((token = rh_next_token(ctx)) != NULL) {
+			if (ctx->flag & RHFLAG_DEBUG) {
+				rh_dump_token(ctx, token);
+			}
+			if (token_top == NULL) {
+				ctx->token = token;
+			} else {
+				token_top->next = token;
+			}
+			token_top = token;
 		}
-		if (token_top == NULL) {
-			ctx->token = token;
-		} else {
-			token_top->next = token;
-		}
-		token_top = token;
 	}
-	rh_free_file(ctx->file);
-
 	
 	int ret = rh_execute(ctx);
+
+	rh_free_file(ctx->file);
 
 	if (ctx->error.count) {
 		rh_dump_error(ctx);

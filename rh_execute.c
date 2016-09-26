@@ -1,15 +1,22 @@
 #include "rh_common.h"
 
-rh_token *token_next(rh_context *ctx) {
-	return ctx->token == NULL ? NULL : (ctx->token = ctx->token->next);
-}
+ rh_token *token_next(rh_context *ctx) {
+	if (ctx->token == NULL)
+		return ctx->token = rh_next_token(ctx);
+	else {
+		if (ctx->token->next == NULL) ctx->token->next = rh_next_token(ctx);
+	 	return ctx->token = ctx->token->next;
+	}
+ }
 
-int token_cmp(rh_token *token, char *ident) {
-	return token != NULL && token->type != TYP_LITERAL && !strcmp(token->text, ident);
-}
+#define token_cmp(token, /* (char *) */ ident) \
+	((token) != NULL && (token)->type != TYP_LITERAL && !strcmp((token)->text, (ident)))
+
+#define token_fetch(ctx) \
+	((ctx)->token == NULL ? ((ctx)->token = token_next(ctx)) : (ctx)->token)
 
 int token_cmp_skip(rh_context *ctx, char *ident) {
-	int ret = token_cmp(ctx->token, ident);
+	int ret = token_cmp(token_fetch(ctx), ident);
 	if (ret) token_next(ctx);
 	return ret;
 }
@@ -73,13 +80,14 @@ rh_variable *expression_with_paren(rh_context *ctx, rh_execute_mode execMode) {
 
 rh_variable *rh_execute_expression_internal_term(rh_context *ctx, rh_execute_mode execMode) {
 	rh_variable *ret = NULL;
-	if (ctx->token->type == TYP_LITERAL) {
-		ret = ctx->token->variable;
-		token_next(ctx);
-	} else if (ctx->token->type == TYP_IDENT) {
-		ret = search_declarator(ctx, ctx->token->text);
-		token_next(ctx);
-	} else if (token_cmp(ctx->token, "(")) ret = expression_with_paren(ctx, execMode);
+	rh_token *token = token_fetch(ctx);
+	if (token->type == TYP_LITERAL) {
+		ret = token->variable;
+		token = token_next(ctx);
+	} else if (token->type == TYP_IDENT) {
+		ret = search_declarator(ctx, token->text);
+		token = token_next(ctx);
+	} else if (token_cmp(token, "(")) ret = expression_with_paren(ctx, execMode);
 	else {
 		E_ERROR(ctx, "Invalid endterm '%s'", ctx->token->text);
 		token_next(ctx);
@@ -305,56 +313,63 @@ rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_ex
 	if (priority == 0) return rh_execute_expression_internal_term(ctx, execMode);
 	else {
 		rh_variable *ret = NULL, *var;
-		rh_token *token = ctx->token, *token1;
+		rh_token *token = token_fetch(ctx), *token0 = token, *token1;
 		if (get_priority(token, OP_PREFIX) == priority) {
 			token_next(ctx);
 			ret = rh_execute_expression_internal(ctx, priority, execMode, isVector);
-			if (ret != NULL && execMode == EM_ENABLED) ret = rh_execute_calculation_pre(ctx, ret, token);
+			if (ret != NULL && execMode == EM_ENABLED) ret = rh_execute_calculation_pre(ctx, ret, token_fetch(ctx));
+			token = token_fetch(ctx);
 		} else {
 			rh_execute_expression_internal(ctx, priority - 1, EM_DISABLED, isVector);
-			if (!(isVector && token_cmp(ctx->token, ",")) && get_priority(ctx->token, OP_BINARY) == priority) {
-				if (is_equal_operator(ctx->token->text)) {
+			token = token_fetch(ctx);
+			if (!(isVector && token_cmp(token, ",")) && get_priority(token, OP_BINARY) == priority) {
+				if (is_equal_operator(token->text)) {
 					rh_token *buf[20];
 					int count = 0;
 					do {
-						buf[count++] = ctx->token; token_next(ctx);
+						buf[count++] = token; token = token_next(ctx);
 						rh_execute_expression_internal(ctx, priority - 1, EM_DISABLED, isVector);
-					} while (get_priority(ctx->token, OP_BINARY) == priority &&
-							is_equal_operator(ctx->token->text));
+						token = token_fetch(ctx);
+					} while (get_priority(token, OP_BINARY) == priority &&
+							is_equal_operator(token->text));
 					if (execMode == EM_ENABLED) {
-						token1 = ctx->token;
+						token1 = token;
 						ctx->token = buf[--count]->next;
 						ret = rh_execute_expression_internal(ctx, priority - 1, EM_ENABLED, isVector);
+						token = token_fetch(ctx);
 						while (count > 0) {
 							ctx->token = buf[count - 1]->next;
 							var = rh_execute_expression_internal(ctx, priority - 1, EM_ENABLED, isVector);
 							ret = rh_execute_calculation_equal(ctx, var, ret, buf[count--]);
 						}
-						ctx->token = token;
+						ctx->token = token0;
 						var = rh_execute_expression_internal(ctx, priority - 1, EM_ENABLED, isVector);
 						ret = rh_execute_calculation_equal(ctx, var, ret, buf[0]);
 						ctx->token = token1;
 					}
 				} else {
 					if (execMode == EM_ENABLED) {
-						ctx->token = token;
+						ctx->token = token0;
 						ret = rh_execute_expression_internal(ctx, priority - 1, execMode, isVector);
+						token = token_fetch(ctx);
 					}
-					while (!(isVector && token_cmp(ctx->token, ",")) && get_priority(ctx->token, OP_BINARY) == priority) {
+					while (!(isVector && token_cmp(token, ",")) && get_priority(token, OP_BINARY) == priority) {
 						// TODO: %%,||を使用時にオペランド1の結果によってオペランド2を評価するかしないか判断
-						token1 = ctx->token;
-						token_next(ctx);
+						token1 = token;
+						token = token_next(ctx);
 						var = rh_execute_expression_internal(ctx, priority - 1, execMode, isVector);
 						if (execMode == EM_ENABLED) ret = rh_execute_calculation_binary(ctx, ret, var, token1);
+						token = token_fetch(ctx);
 					}
 				}
 			} else {
 				if (execMode == EM_ENABLED) {
-					ctx->token = token;
+					ctx->token = token0;
 					ret = rh_execute_expression_internal(ctx, priority - 1, execMode, isVector);
+					token = token_fetch(ctx);
 				}
-				while (get_priority(ctx->token, OP_POSTFIX) == priority) {
-					if (isVector && token_cmp(ctx->token, ",")) break;
+				while (get_priority(token, OP_POSTFIX) == priority) {
+					if (isVector && token_cmp(token, ",")) break;
 					if (token_cmp_skip(ctx, "[")) {
 						rh_variable *indexVal = rh_execute_expression(ctx, execMode, 1);
 						token_cmp_error_skip(ctx, "]");
@@ -373,10 +388,11 @@ rh_variable *rh_execute_expression_internal(rh_context *ctx, int priority, rh_ex
 							}
 						}
 					} else {
-						token1 = ctx->token;
+						token1 = token;
 						if (token_cmp_skip(ctx, "++") || token_cmp_skip(ctx, "--"))
 							if (execMode == EM_ENABLED) ret = rh_execute_calculation_post(ctx, ret, token1);
 					}
+					token = token_fetch(ctx);
 				}
 			}
 		}
@@ -429,10 +445,11 @@ rh_type *read_type_declarator(rh_context *ctx, rh_type *parent, rh_token **pToke
 		ret = type;
 	} else {
 		ret = parent;
-		if (ctx->token->type == TYP_IDENT) {
+		rh_token *token = token_fetch(ctx);
+		if (token->type == TYP_IDENT) {
 			if (identMode == -1) {
 				E_ERROR(ctx, "Unexpected identifier");
-			} else if (pToken != NULL) *pToken = ctx->token;
+			} else if (pToken != NULL) *pToken = token;
 			token_next(ctx);
 		}
 	}
@@ -497,7 +514,7 @@ int execute_brace_initializer(rh_context *ctx, rh_type *type, rh_execute_mode ex
 rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMode) {
 	int needsSemicolon = 1, i;
 	rh_statement_result res = SR_NORMAL;
-	rh_token *token = ctx->token, *token1;
+	rh_token *token = token_fetch(ctx), *token0, *token1;
 	rh_variable *var;
 	if (token_cmp_skip(ctx, "if")) {
 		var = expression_with_paren(ctx, execMode);
@@ -507,7 +524,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			res = rh_execute_statement(ctx, execMode && !i && res == SR_NORMAL);
 		needsSemicolon = 0;
 	} else if (token_cmp_skip(ctx, "while")) {
-		token = ctx->token;
+		token1 = token_fetch(ctx);
 		for (;;) {
 			var = expression_with_paren(ctx, execMode);
 			rh_variable_to_int(ctx, var, &i);
@@ -515,11 +532,11 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			if (!execMode || !i || res == SR_BREAK) {
 				res = SR_NORMAL; break;
 			} else if (res == SR_RETURN) break;
-			ctx->token = token;
+			ctx->token = token1;
 		}
 		needsSemicolon = 0;
 	} else if (token_cmp_skip(ctx, "do")) {
-		token = ctx->token;
+		token1 = token_fetch(ctx);
 		for (;;) {
 			res = rh_execute_statement(ctx, execMode);
 			token_cmp_error_skip(ctx, "while");
@@ -530,18 +547,18 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			}
 			rh_variable_to_int(ctx, var, &i);
 			if (!i) break;
-			ctx->token = token;
+			ctx->token = token1;
 		}
 	} else if (token_cmp_skip(ctx, "for")) {
 		token_cmp_error_skip(ctx, "(");
 		rh_execute_expression(ctx, execMode, 0);
 		token_cmp_error_skip(ctx, ";");
-		token = ctx->token;
+		token0 = token_fetch(ctx);
 		for (;;) {
 			var = rh_execute_expression(ctx, execMode, 0);
 			rh_variable_to_int(ctx, var, &i);
 			token_cmp_error_skip(ctx, ";");
-			token1 = ctx->token;
+			token1 = token_fetch(ctx);
 			rh_execute_expression(ctx, EM_DISABLED, 0);
 			token_cmp_error_skip(ctx, ")");
 			res = rh_execute_statement(ctx, execMode && i);
@@ -550,15 +567,16 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			} else if (res == SR_RETURN) break;
 			ctx->token = token1;
 			rh_execute_expression(ctx, execMode, 0);
-			ctx->token = token;
+			ctx->token = token0;
 		}
 		needsSemicolon = 0;
 	} else if (token_cmp_skip(ctx, "{")) {
 		rh_statement_result res2;
 		rh_variable *varTop = ctx->variable_top;
 		ctx->variable_top = ctx->variable;
-		while (ctx->token != NULL && !token_cmp(ctx->token, "}")) {
+		while (token != NULL && !token_cmp(token, "}")) {
 			res2 = rh_execute_statement(ctx, execMode && res == SR_NORMAL);
+			token = token_fetch(ctx);
 			if (res2 != SR_NORMAL) res = res2;
 		}
 		token_cmp_error_skip(ctx, "}");
@@ -569,7 +587,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		}
 		ctx->variable_top = varTop;
 		needsSemicolon = 0;
-	} else if (token_cmp(ctx->token, ";"));
+	} else if (token_cmp(token, ";"));
 	else if (token_cmp_skip(ctx, "break"))   { if (execMode == EM_ENABLED) res = SR_BREAK;    }
 	else if (token_cmp_skip(ctx, "continue")){ if (execMode == EM_ENABLED) res = SR_CONTINUE; }
 	else if (token_cmp_skip(ctx, "return"))  { if (execMode == EM_ENABLED) res = SR_RETURN;   }
@@ -621,7 +639,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 							memset(var->memory, 0, sType->size);
 						}
 					}
-					if (sType == RHTYP_ARRAY && sType->length == -1) {
+					if (sType->kind == RHTYP_ARRAY && sType->length == -1) {
 						E_ERROR(ctx, "length error");
 						sType->length = 1;
 					}
@@ -633,7 +651,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 				} else {
 					E_ERROR(ctx, "Variable decl err.");
 				}
-			} while (ctx->token != NULL && token_cmp_skip(ctx, ","));
+			} while (token_fetch(ctx) != NULL && token_cmp_skip(ctx, ","));
 		} else {
 			rh_variable *var = rh_execute_expression(ctx, execMode, 0);
 			if (execMode == EM_ENABLED) {
@@ -647,8 +665,12 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 }
 
 int rh_execute(rh_context *ctx) {
-	while (ctx->token != NULL) {
+	while (token_fetch(ctx) != NULL) {
 		rh_execute_statement(ctx, EM_ENABLED);
+
+		if ((ctx->flag & RHFLAG_INTERACTIVE) && ctx->error.count) {
+			rh_dump_error(ctx);
+		}
 	}
 	return 0;
 }

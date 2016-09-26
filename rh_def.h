@@ -11,7 +11,8 @@ typedef struct rh_variable	rh_variable;
 struct rh_context {
 	enum {
 		RHFLAG_DEBUG = 1,
-		RHFLAG_STDIN = 2
+		RHFLAG_STDIN = 2,
+		RHFLAG_INTERACTIVE = 3
 	} flag;
 	rh_file *file;
 	unsigned char *memory;
