@@ -511,6 +511,62 @@ int execute_brace_initializer(rh_context *ctx, rh_type *type, rh_execute_mode ex
 	return 0;
 }
 
+rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode execMode, rh_type *type, rh_token *idToken) {
+	rh_variable *var, *var2, *var3;
+	rh_statement_result res = SR_NORMAL;
+	for (var = ctx->variable; var != ctx->variable_top; var = var->next) {
+		if (strcmp(var->token->text, idToken->text) == 0) {
+			E_ERROR(ctx, "The name '%s' is already in use.", idToken->text);
+			return res;
+		}
+	}
+	if (execMode == EM_ENABLED) {
+		var = rh_init_variable(NULL);	// TODO: 関数内ではスタックに確保する
+		var->type = type;
+		var->token = idToken;
+		var->is_left = 1;
+		if (type->kind == RHTYP_ARRAY) {
+			var->address = -1;
+			var->memory = rh_malloc(sizeof(int));	///< 配列が確保される先の仮想アドレスが入る
+			(*(int *)var->memory) = ctx->hp;
+		} else {
+			var->address = ctx->hp;
+			var->memory = ctx->memory + ctx->hp;
+			ctx->hp += type->size;
+		}
+	}
+	if (token_cmp_skip(ctx, "=")) {
+		if (token_cmp_skip(ctx, "{")) {
+			if (execMode == EM_ENABLED) {
+				if (type->kind == RHTYP_POINTER) (*(int *)var->memory) = ctx->hp;
+				else if (type->kind != RHTYP_ARRAY) ctx->hp -= type->size;
+			}
+			if (!execute_brace_initializer(ctx, type, execMode)) {
+				E_ERROR(ctx, "variable initialize error");
+			}
+		} else {
+			var2 = rh_execute_expression(ctx, execMode, 1);
+			if (execMode == EM_ENABLED){
+				rh_assign_variable(ctx, var, var2);
+			}
+		}
+	} else {
+		if (execMode == EM_ENABLED) {
+			memset(var->memory, 0, type->size);
+		}
+	}
+	if (type->kind == RHTYP_ARRAY && type->length == -1) {
+		E_ERROR(ctx, "length error");
+		type->length = 1;
+	}
+	type->size = rh_get_typesize(type);
+	if (execMode == EM_ENABLED) {
+		var->next = ctx->variable;
+		ctx->variable = var;
+	}
+	return res;
+}
+
 rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMode) {
 	int needsSemicolon = 1, i;
 	rh_statement_result res = SR_NORMAL;
@@ -598,58 +654,9 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 				rh_token *idToken;
 				rh_type *sType = read_type_declarator(ctx, type, &idToken, 1, execMode);
 				if (sType != NULL) {
-					rh_variable *var, *var2, *var3;
-					for (var = ctx->variable; var != ctx->variable_top; var = var->next) {
-						if (strcmp(var->token->text, idToken->text) == 0) {
-							E_ERROR(ctx, "The name '%s' is already in use.", idToken->text);
-						}
-					}
-					if (execMode == EM_ENABLED) {
-						var = rh_init_variable(NULL);	// TODO: 関数内ではスタックに確保する
-						var->type = sType;
-						var->token = idToken;
-						var->is_left = 1;
-						if (sType->kind == RHTYP_ARRAY) {
-							var->address = -1;
-							var->memory = rh_malloc(sizeof(int));	///< 配列が確保される先の仮想アドレスが入る
-							(*(int *)var->memory) = ctx->hp;
-						} else {
-							var->address = ctx->hp;
-							var->memory = ctx->memory + ctx->hp;
-							ctx->hp += sType->size;
-						}
-					}
-					if (token_cmp_skip(ctx, "=")) {
-						if (token_cmp_skip(ctx, "{")) {
-							if (execMode == EM_ENABLED) {
-								if (sType->kind == RHTYP_POINTER) (*(int *)var->memory) = ctx->hp;
-								else if (sType->kind != RHTYP_ARRAY) ctx->hp -= sType->size;
-							}
-							if (!execute_brace_initializer(ctx, sType, execMode)) {
-								E_ERROR(ctx, "variable initialize error");
-							}
-						} else {
-							var2 = rh_execute_expression(ctx, execMode, 1);
-							if (execMode == EM_ENABLED){
-								rh_assign_variable(ctx, var, var2);
-							}
-						}
-					} else {
-						if (execMode == EM_ENABLED) {
-							memset(var->memory, 0, sType->size);
-						}
-					}
-					if (sType->kind == RHTYP_ARRAY && sType->length == -1) {
-						E_ERROR(ctx, "length error");
-						sType->length = 1;
-					}
-					sType->size = rh_get_typesize(sType);
-					if (execMode == EM_ENABLED) {
-						var->next = ctx->variable;
-						ctx->variable = var;
-					}
+					res = rh_execute_statement_type(ctx, execMode, sType, idToken);
 				} else {
-					E_ERROR(ctx, "Variable decl err.");
+					E_ERROR(ctx, "type decl err.");
 				}
 			} while (token_fetch(ctx) != NULL && token_cmp_skip(ctx, ","));
 		} else {
