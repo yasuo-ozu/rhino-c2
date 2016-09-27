@@ -520,6 +520,7 @@ int execute_brace_initializer(rh_context *ctx, rh_type *type, rh_execute_mode ex
 	return 0;
 }
 
+rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMode);
 rh_variable *rh_execute_statement_variable(rh_context *ctx, rh_execute_mode execMode, rh_type *type, rh_token *idToken) {
 	rh_variable *var, *var2;
 	if (execMode == EM_ENABLED) {
@@ -567,8 +568,9 @@ rh_variable *rh_execute_statement_variable(rh_context *ctx, rh_execute_mode exec
 
 rh_variable *rh_execute_statement_function(rh_context *ctx, rh_execute_mode execMode, rh_type *type, rh_token *idToken0) {
 	rh_token *token = token_fetch(ctx), *idToken;
-	rh_variable *var = rh_init_variable(NULL);
+	rh_variable *var = rh_init_variable(NULL), *var1, *varTop = NULL;
 	rh_type *type0, *type1;
+	int nullTokenCount = 0;
 	var->args = 0;
 	var->token = idToken0;
 	while (!token_cmp(token, ")")) {
@@ -579,11 +581,31 @@ rh_variable *rh_execute_statement_function(rh_context *ctx, rh_execute_mode exec
 			type0->size = 4; type->sign = 1;
 		}
 		type1 = read_type_declarator(ctx, type0, &idToken, 0, execMode);	// idToken maybe null
+		if (type1 == NULL) nullTokenCount++;
+		var1 = rh_init_variable(NULL);
+		var1->type = type1;
+		var1->token = idToken;
+		if (var->args == NULL) var->args = varTop = var1;
+		else {
+			varTop->next = var1;
+			varTop = var1;
+		}
 		var->args++;
 		if (!token_cmp_skip(ctx, ",")) break;
+		token = token_fetch(ctx);
 	}
 	token_cmp_error_skip(ctx, ")");
-
+	token = token_fetch(ctx);
+	if (nullTokenCount && token_cmp(token, "{")) {
+		E_ERROR(ctx, "func decl err");
+		return NULL;
+	}
+	if (token_cmp(token, "{")) {
+		var->token = token;		// compound statement (function body)
+		rh_execute_statement(ctx, EM_DISABLED);
+	} else {
+		token_cmp_error_skip(ctx, ";");
+	}
 	return var;
 }
 
@@ -609,7 +631,7 @@ rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode e
 			} else {
 				var = rh_execute_statement_variable(ctx, execMode, type, idToken);
 			}
-			if (execMode == EM_ENABLED) {
+			if (execMode == EM_ENABLED && var != NULL) {
 				var->next = ctx->variable;
 				ctx->variable = var;
 			}
