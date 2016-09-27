@@ -72,6 +72,8 @@ struct rh_variable {
 	rh_variable *next;	///< Used when table entry
 	int is_dynamic;		///< Set when *memory is malloced.
 	int is_left;
+	rh_variable *args;
+	int args_count;		///< -1 when not a function
 };
 
 /* initialized in rh_error.c */

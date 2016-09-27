@@ -9,6 +9,8 @@ rh_variable *rh_init_variable(rh_type *type) {
 	var->next = NULL;
 	var->is_dynamic = 0;
 	var->is_left = 0;
+	var->args = NULL;
+	var->args_count = -1;
 	if (type != NULL) {
 		var->memory = rh_malloc(rh_get_typesize(type));
 		var->address = -1;
