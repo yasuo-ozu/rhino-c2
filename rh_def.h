@@ -65,7 +65,7 @@ struct rh_type {
 
 /* initialized in rh_variable.c */
 struct rh_variable {
-	rh_token *token;	///< Assigned when table entry
+	rh_token *token;	///< Assigned when table entry || func
 	rh_type *type;
 	unsigned char *memory;
 	int address;		///< -1 when malloc()

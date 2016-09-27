@@ -565,28 +565,60 @@ rh_variable *rh_execute_statement_variable(rh_context *ctx, rh_execute_mode exec
 	return var;
 }
 
-rh_variable *rh_execute_statement_function(rh_context *ctx, rh_execute_mode execMode, rh_type *type, rh_token *idToken) {
+rh_variable *rh_execute_statement_function(rh_context *ctx, rh_execute_mode execMode, rh_type *type, rh_token *idToken0) {
+	rh_token *token = token_fetch(ctx), *idToken;
+	rh_variable *var = rh_init_variable(NULL);
+	rh_type *type0, *type1;
+	var->args = 0;
+	var->token = idToken0;
+	while (!token_cmp(token, ")")) {
+		type0 = read_type_speifier(ctx, execMode);
+		if (type0 == NULL) {	// int
+			type0 = rh_init_type();
+			type0->kind == RHTYP_NUMERIC;
+			type0->size = 4; type->sign = 1;
+		}
+		type1 = read_type_declarator(ctx, type0, &idToken, 0, execMode);	// idToken maybe null
+		var->args++;
+		if (!token_cmp_skip(ctx, ",")) break;
+	}
+	token_cmp_error_skip(ctx, ")");
 
+	return var;
 }
 
-rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode execMode, rh_type *type, rh_token *idToken) {
+rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode execMode, rh_type *type0) {
 	rh_variable *var;
+	rh_type *type;
 	rh_statement_result res = SR_NORMAL;
-	for (var = ctx->variable; var != ctx->variable_top; var = var->next) {
-		if (strcmp(var->token->text, idToken->text) == 0) {
-			E_ERROR(ctx, "The name '%s' is already in use.", idToken->text);
-			execMode = EM_DISABLED;
+	rh_token *idToken;
+	int isFunction = 0;
+	do {
+		rh_token *idToken;
+		type = read_type_declarator(ctx, type0, &idToken, 1, execMode);
+		if (type != NULL && idToken != NULL) {
+			for (var = ctx->variable; var != ctx->variable_top; var = var->next) {
+				if (strcmp(var->token->text, idToken->text) == 0) {
+					E_ERROR(ctx, "The name '%s' is already in use.", idToken->text);
+					execMode = EM_DISABLED;
+				}
+			}
+			if (token_cmp_skip(ctx, "(")) {
+				var = rh_execute_statement_function(ctx, execMode, type, idToken);
+				isFunction = 1;
+			} else {
+				var = rh_execute_statement_variable(ctx, execMode, type, idToken);
+			}
+			if (execMode == EM_ENABLED) {
+				var->next = ctx->variable;
+				ctx->variable = var;
+			}
+			if (isFunction) break;
+		} else {
+			E_ERROR(ctx, "type decl err.");
 		}
-	}
-	if (token_cmp_skip(ctx, "(")) {
-		var = rh_execute_statement_function(ctx, execMode, type, idToken);
-	} else {
-		var = rh_execute_statement_variable(ctx, execMode, type, idToken);
-	}
-	if (execMode == EM_ENABLED) {
-		var->next = ctx->variable;
-		ctx->variable = var;
-	}
+	} while (token_fetch(ctx) != NULL && token_cmp_skip(ctx, ","));
+	if (!isFunction) token_cmp_error_skip(ctx, ";");
 	return res;
 }
 
@@ -677,15 +709,8 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 	else {
 		rh_type *type = read_type_speifier(ctx, execMode);
 		if (type != NULL) {
-			do {
-				rh_token *idToken;
-				rh_type *sType = read_type_declarator(ctx, type, &idToken, 1, execMode);
-				if (sType != NULL) {
-					res = rh_execute_statement_type(ctx, execMode, sType, idToken);
-				} else {
-					E_ERROR(ctx, "type decl err.");
-				}
-			} while (token_fetch(ctx) != NULL && token_cmp_skip(ctx, ","));
+			res = rh_execute_statement_type(ctx, execMode, type);
+			needsSemicolon = 0;
 		} else {
 			rh_variable *var = rh_execute_expression(ctx, execMode, 0);
 			if (execMode == EM_ENABLED && (ctx->flag & RHFLAG_INTERACTIVE)) {
