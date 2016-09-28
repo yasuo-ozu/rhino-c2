@@ -56,7 +56,7 @@ struct rh_token {
 /* initialized in rh_type.c */
 struct rh_type {
 	enum {
-		RHTYP_NULL, RHTYP_ARRAY, RHTYP_POINTER, RHTYP_NUMERIC, RHTYP_FLOATING
+		RHTYP_NULL, RHTYP_ARRAY, RHTYP_POINTER, RHTYP_NUMERIC, RHTYP_FLOATING, RHTYP_VOID
 	} kind;
 	int length;		///< Array length. Used when ARRAY
 	rh_type *child;	///< Used when ARRAY || POINTER

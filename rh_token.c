@@ -157,6 +157,7 @@ void rh_next_token_literal(rh_context *ctx, char c, rh_token *token) {
 		rh_type *type2 = rh_init_type();
 		type2->kind = RHTYP_POINTER;
 		type2->child = type;
+		type2->size = rh_get_typesize(type2);
 		type = type2;
 	}
 	while ((c = rh_getchar(ctx)) != a) {

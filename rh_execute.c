@@ -30,8 +30,19 @@ int token_cmp_error_skip(rh_context *ctx, char *ident) {
 }
 
 typedef enum {
+	EM_DISABLED = 0, EM_ENABLED = 1
+} rh_execute_mode;
+
+typedef enum {
 	OP_PREFIX = 2, OP_POSTFIX = 4, OP_BINARY = 1, OP_CONDITIONAL
 } rh_operator_type;
+
+typedef struct {
+	enum {
+		SR_NORMAL = 0, SR_RETURN, SR_CONTINUE, SR_BREAK
+	} type;
+	rh_variable *var;
+} rh_statement_result;
 
 int get_priority(rh_token *token, rh_operator_type type) {
 	static struct {
@@ -57,10 +68,6 @@ int get_priority(rh_token *token, rh_operator_type type) {
 	return -1;
 }
 
-typedef enum {
-	EM_DISABLED = 0, EM_ENABLED = 1
-} rh_execute_mode;
-
 rh_variable *search_declarator(rh_context *ctx, char *text) {
 	rh_variable *var = ctx->variable;
 	while (var != NULL) {
@@ -69,10 +76,6 @@ rh_variable *search_declarator(rh_context *ctx, char *text) {
 	}
 	return var;
 }
-
-typedef enum {
-	SR_NORMAL = 0, SR_RETURN, SR_CONTINUE, SR_BREAK
-} rh_statement_result;
 
 rh_variable *rh_execute_expression(rh_context *ctx, rh_execute_mode execMode, int isVector);
 rh_variable *expression_with_paren(rh_context *ctx, rh_execute_mode execMode) {
@@ -87,9 +90,21 @@ rh_variable *rh_execute_expression_functioncall(rh_context *ctx, rh_variable *fu
 	token_cmp_error_skip(ctx, ")");	// TODO: 本来なら引数を処理
 	rh_token *token0 = token_fetch(ctx);
 	ctx->token = func->func_body;
-	rh_execute_statement(ctx, execMode);
+	rh_statement_result res = rh_execute_statement(ctx, execMode);
 	ctx->token = token0;
-	return func;	// TODO: 本来なら関数の結果を返す
+	if (execMode == EM_DISABLED) return NULL;
+	rh_variable *var = res.var;
+	if (res.type != SR_RETURN) {
+		if (strcmp(func->token->text, "main") != 0) {
+			E_ERROR(ctx, "func return error");
+		}
+		rh_type *type = rh_init_type();
+		type->kind = RHTYP_NUMERIC;
+		type->size = 4; type->sign = 1;
+		var = rh_init_variable(type);
+		(*(int *) var->memory) = 0;
+	}
+	return rh_convert_variable(ctx, var, func->type, 0);
 }
 
 rh_variable *rh_execute_expression_internal_term(rh_context *ctx, rh_execute_mode execMode) {
@@ -587,11 +602,12 @@ rh_variable *rh_execute_statement_function(rh_context *ctx, rh_execute_mode exec
 	var->args_count = 0;
 	var->args = NULL;
 	var->token = idToken0;
+	var->type = type;
 	while (!token_cmp(token, ")")) {
 		type0 = read_type_speifier(ctx, execMode);
 		if (type0 == NULL) {	// int
 			type0 = rh_init_type();
-			type0->kind == RHTYP_NUMERIC;
+			type0->kind = RHTYP_NUMERIC;
 			type0->size = 4; type->sign = 1;
 		}
 		type1 = read_type_declarator(ctx, type0, &idToken, 0, execMode);	// idToken maybe null
@@ -626,7 +642,7 @@ rh_variable *rh_execute_statement_function(rh_context *ctx, rh_execute_mode exec
 rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode execMode, rh_type *type0) {
 	rh_variable *var;
 	rh_type *type;
-	rh_statement_result res = SR_NORMAL;
+	rh_statement_result res = {SR_NORMAL, NULL};
 	rh_token *idToken;
 	int isFunction = 0;
 	do {
@@ -634,7 +650,7 @@ rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode e
 		type = read_type_declarator(ctx, type0, &idToken, 1, execMode);
 		if (type != NULL && idToken != NULL) {
 			for (var = ctx->variable; var != ctx->variable_top; var = var->next) {
-				if (strcmp(var->token->text, idToken->text) == 0) {		// TODO: 関数定義と関数宣言で名前が被るときは大目に見る
+				if (strcmp(var->token->text, idToken->text) == 0 && var->func_body != NULL) {
 					E_ERROR(ctx, "The name '%s' is already in use.", idToken->text);
 					execMode = EM_DISABLED;
 				}
@@ -660,7 +676,7 @@ rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode e
 
 rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMode) {
 	int needsSemicolon = 1, i;
-	rh_statement_result res = SR_NORMAL;
+	rh_statement_result res = {SR_NORMAL, NULL};
 	rh_token *token = token_fetch(ctx), *token0 = token, *token1;
 	rh_variable *var;
 	if (token->child[0] != NULL && execMode == EM_DISABLED) {
@@ -672,7 +688,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		rh_variable_to_int(ctx, var, &i);
 		res = rh_execute_statement(ctx, execMode && i);
 		if (token_cmp_skip(ctx, "else"))
-			res = rh_execute_statement(ctx, execMode && !i && res == SR_NORMAL);
+			res = rh_execute_statement(ctx, execMode && !i && res.type == SR_NORMAL);
 		needsSemicolon = 0;
 	} else if (token_cmp_skip(ctx, "while")) {
 		token1 = token_fetch(ctx);
@@ -680,9 +696,9 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			var = expression_with_paren(ctx, execMode);
 			rh_variable_to_int(ctx, var, &i);
 			res = rh_execute_statement(ctx, execMode && i);
-			if (!execMode || !i || res == SR_BREAK) {
-				res = SR_NORMAL; break;
-			} else if (res == SR_RETURN) break;
+			if (!execMode || !i || res.type == SR_BREAK) {
+				res.type = SR_NORMAL; break;
+			} else if (res.type == SR_RETURN) break;
 			ctx->token = token1;
 		}
 		needsSemicolon = 0;
@@ -692,9 +708,9 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			res = rh_execute_statement(ctx, execMode);
 			token_cmp_error_skip(ctx, "while");
 			var = expression_with_paren(ctx, execMode);
-			if (execMode == EM_DISABLED || res == SR_RETURN) break;
-			if (res == SR_BREAK) {
-				res = SR_NORMAL; break;
+			if (execMode == EM_DISABLED || res.type == SR_RETURN) break;
+			if (res.type == SR_BREAK) {
+				res.type = SR_NORMAL; break;
 			}
 			rh_variable_to_int(ctx, var, &i);
 			if (!i) break;
@@ -713,9 +729,9 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 			rh_execute_expression(ctx, EM_DISABLED, 0);
 			token_cmp_error_skip(ctx, ")");
 			res = rh_execute_statement(ctx, execMode && i);
-			if (execMode == EM_DISABLED || !i || res == SR_BREAK) {
-				res = SR_NORMAL; break;
-			} else if (res == SR_RETURN) break;
+			if (execMode == EM_DISABLED || !i || res.type == SR_BREAK) {
+				res.type = SR_NORMAL; break;
+			} else if (res.type == SR_RETURN) break;
 			ctx->token = token1;
 			rh_execute_expression(ctx, execMode, 0);
 			ctx->token = token2;
@@ -727,9 +743,9 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		ctx->variable_top = ctx->variable;
 		token = token_fetch(ctx);
 		while (token != NULL && !token_cmp(token, "}")) {
-			res2 = rh_execute_statement(ctx, execMode && res == SR_NORMAL);
+			res2 = rh_execute_statement(ctx, execMode && res.type == SR_NORMAL);
 			token = token_fetch(ctx);
-			if (res2 != SR_NORMAL) res = res2;
+			if (res2.type != SR_NORMAL) res = res2;
 		}
 		token_cmp_error_skip(ctx, "}");
 		while (ctx->variable != ctx->variable_top) {
@@ -740,10 +756,21 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		ctx->variable_top = varTop;
 		needsSemicolon = 0;
 	} else if (token_cmp(token, ";"));
-	else if (token_cmp_skip(ctx, "break"))   { if (execMode == EM_ENABLED) res = SR_BREAK;    }
-	else if (token_cmp_skip(ctx, "continue")){ if (execMode == EM_ENABLED) res = SR_CONTINUE; }
-	else if (token_cmp_skip(ctx, "return"))  { if (execMode == EM_ENABLED) res = SR_RETURN;   }
-	else {
+	else if (token_cmp_skip(ctx, "break"))   { if (execMode == EM_ENABLED) res.type = SR_BREAK;    }
+	else if (token_cmp_skip(ctx, "continue")){ if (execMode == EM_ENABLED) res.type = SR_CONTINUE; }
+	else if (token_cmp_skip(ctx, "return"))  { 
+		if (execMode == EM_ENABLED) res.type = SR_RETURN;
+		if (token_cmp(token_fetch(ctx), ";")) {
+			if (execMode == EM_ENABLED) {
+				res.var = rh_init_variable(NULL);
+				res.var->type = rh_init_type();
+				res.var->type->kind = RHTYP_VOID;
+				res.var->type->size = 0;
+			}
+		} else {
+			res.var = rh_execute_expression(ctx, execMode, 0);
+		}
+	} else {
 		rh_type *type = read_type_speifier(ctx, execMode);
 		if (type != NULL) {
 			res = rh_execute_statement_type(ctx, execMode, type);

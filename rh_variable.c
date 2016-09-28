@@ -12,7 +12,7 @@ rh_variable *rh_init_variable(rh_type *type) {
 	var->args = NULL;
 	var->args_count = -1;
 	var->func_body = NULL;
-	if (type != NULL) {
+	if (type != NULL && type->size > 0) {
 		var->memory = rh_malloc(rh_get_typesize(type));
 		var->address = -1;
 	}
@@ -128,9 +128,11 @@ rh_variable *rh_convert_variable(rh_context *ctx, rh_variable *var, rh_type *typ
 			return ret;
 		}
 	}
-	E_ERROR(ctx, "type convert error");
-	rh_free_variable(ret);
-	return NULL;
+	if (var->type->kind != RHTYP_VOID || type->kind != RHTYP_VOID) {
+		E_ERROR(ctx, "type convert error");
+	}
+	if (ret->memory != NULL) memset(ret->memory, 0, type->size);
+	return ret;
 }
 
 int rh_variable_to_int(rh_context *ctx, rh_variable *var, int *intval) {
