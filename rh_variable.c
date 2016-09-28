@@ -11,6 +11,7 @@ rh_variable *rh_init_variable(rh_type *type) {
 	var->is_left = 0;
 	var->args = NULL;
 	var->args_count = -1;
+	var->func_body = NULL;
 	if (type != NULL) {
 		var->memory = rh_malloc(rh_get_typesize(type));
 		var->address = -1;

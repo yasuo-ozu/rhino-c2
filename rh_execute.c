@@ -70,12 +70,26 @@ rh_variable *search_declarator(rh_context *ctx, char *text) {
 	return var;
 }
 
+typedef enum {
+	SR_NORMAL = 0, SR_RETURN, SR_CONTINUE, SR_BREAK
+} rh_statement_result;
+
 rh_variable *rh_execute_expression(rh_context *ctx, rh_execute_mode execMode, int isVector);
 rh_variable *expression_with_paren(rh_context *ctx, rh_execute_mode execMode) {
 	token_cmp_error_skip(ctx, "(");
 	rh_variable *ret = rh_execute_expression(ctx, execMode, 0);
 	token_cmp_error_skip(ctx, ")");
 	return ret;
+}
+
+rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMode);
+rh_variable *rh_execute_expression_functioncall(rh_context *ctx, rh_variable *func, rh_execute_mode execMode) {
+	token_cmp_error_skip(ctx, ")");	// TODO: 本来なら引数を処理
+	rh_token *token0 = token_fetch(ctx);
+	ctx->token = func->func_body;
+	rh_execute_statement(ctx, execMode);
+	ctx->token = token0;
+	return func;	// TODO: 本来なら関数の結果を返す
 }
 
 rh_variable *rh_execute_expression_internal_term(rh_context *ctx, rh_execute_mode execMode) {
@@ -87,6 +101,9 @@ rh_variable *rh_execute_expression_internal_term(rh_context *ctx, rh_execute_mod
 	} else if (token->type == TYP_IDENT) {
 		ret = search_declarator(ctx, token->text);
 		token = token_next(ctx);
+		if (ret->args_count != -1 && token_cmp_skip(ctx, "(")) {	// Function call
+			ret = rh_execute_expression_functioncall(ctx, ret, execMode);
+		}
 	} else if (token_cmp(token, "(")) ret = expression_with_paren(ctx, execMode);
 	else {
 		E_ERROR(ctx, "Invalid endterm '%s'", ctx->token->text);
@@ -484,10 +501,6 @@ rh_type *read_type_declarator(rh_context *ctx, rh_type *parent, rh_token **pToke
 	return ret;
 }
 
-typedef enum {
-	SR_NORMAL = 0, SR_RETURN, SR_CONTINUE, SR_BREAK
-} rh_statement_result;
-
 int execute_brace_initializer(rh_context *ctx, rh_type *type, rh_execute_mode execMode) {
 	if (type->kind == RHTYP_POINTER || type->kind == RHTYP_ARRAY) {
 		int i = 0, count = -1, nest = 0, size = rh_get_typesize(type->child);
@@ -571,7 +584,8 @@ rh_variable *rh_execute_statement_function(rh_context *ctx, rh_execute_mode exec
 	rh_variable *var = rh_init_variable(NULL), *var1, *varTop = NULL;
 	rh_type *type0, *type1;
 	int nullTokenCount = 0;
-	var->args = 0;
+	var->args_count = 0;
+	var->args = NULL;
 	var->token = idToken0;
 	while (!token_cmp(token, ")")) {
 		type0 = read_type_speifier(ctx, execMode);
@@ -590,7 +604,7 @@ rh_variable *rh_execute_statement_function(rh_context *ctx, rh_execute_mode exec
 			varTop->next = var1;
 			varTop = var1;
 		}
-		var->args++;
+		var->args_count++;
 		if (!token_cmp_skip(ctx, ",")) break;
 		token = token_fetch(ctx);
 	}
@@ -601,7 +615,7 @@ rh_variable *rh_execute_statement_function(rh_context *ctx, rh_execute_mode exec
 		return NULL;
 	}
 	if (token_cmp(token, "{")) {
-		var->token = token;		// compound statement (function body)
+		var->func_body = token;		// compound statement (function body)
 		rh_execute_statement(ctx, EM_DISABLED);
 	} else {
 		token_cmp_error_skip(ctx, ";");
@@ -620,7 +634,7 @@ rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode e
 		type = read_type_declarator(ctx, type0, &idToken, 1, execMode);
 		if (type != NULL && idToken != NULL) {
 			for (var = ctx->variable; var != ctx->variable_top; var = var->next) {
-				if (strcmp(var->token->text, idToken->text) == 0) {
+				if (strcmp(var->token->text, idToken->text) == 0) {		// TODO: 関数定義と関数宣言で名前が被るときは大目に見る
 					E_ERROR(ctx, "The name '%s' is already in use.", idToken->text);
 					execMode = EM_DISABLED;
 				}

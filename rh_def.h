@@ -74,6 +74,7 @@ struct rh_variable {
 	int is_left;
 	rh_variable *args;
 	int args_count;		///< -1 when not a function
+	rh_token *func_body;
 };
 
 /* initialized in rh_error.c */
