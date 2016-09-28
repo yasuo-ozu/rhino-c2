@@ -711,6 +711,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		rh_statement_result res2;
 		rh_variable *varTop = ctx->variable_top;
 		ctx->variable_top = ctx->variable;
+		token = token_fetch(ctx);
 		while (token != NULL && !token_cmp(token, "}")) {
 			res2 = rh_execute_statement(ctx, execMode && res == SR_NORMAL);
 			token = token_fetch(ctx);
