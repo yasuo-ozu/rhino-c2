@@ -104,6 +104,9 @@ rh_variable *rh_convert_variable(rh_context *ctx, rh_variable *var, rh_type *typ
 		long long intval = 0;
 		memcpy(&intval, var->memory, var->type->size);
 		if (type->kind == RHTYP_NUMERIC) {
+			if (!force && type->size < var->type->size) {
+				E_WARNING(ctx, "numeric size");
+			}
 			memcpy(ret->memory, &intval, type->size);
 			return ret;
 		} else if (type->kind == RHTYP_FLOATING) {
@@ -122,9 +125,29 @@ rh_variable *rh_convert_variable(rh_context *ctx, rh_variable *var, rh_type *typ
 			memcpy(ret->memory, &intval, type->size);
 			return ret;
 		} else if (type->kind == RHTYP_FLOATING) {
+			if (!force && type->size < var->type->size) {
+				E_WARNING(ctx, "floating size");
+			}
 			if (type->size ==  4) (*(float *)var->memory) = (float) dblval;
 			if (type->size ==  8) (*(double *)var->memory) = (double) dblval;
 			if (type->size == 16) (*(long double *)var->memory) = (long double) dblval;
+			return ret;
+		}
+	} else if (var->type->kind == RHTYP_POINTER) {
+		if (type->kind == RHTYP_POINTER) {
+			if (var->type->child->kind != type->child->kind &&  !force && 
+					var->type->child->kind != RHTYP_VOID && type->child->kind != RHTYP_VOID) {
+				E_ERROR(ctx, "pointer convert error");
+			}
+			memcpy(ret->memory, var->memory, type->size);
+			return ret;
+		} else if (type->kind == RHTYP_NUMERIC) {
+			if (!force) {
+				E_ERROR(ctx, "pointer convert error");
+			}
+			long long longval = 0;
+			memcpy(&longval, var->memory, var->type->size);
+			memcpy(ret->memory, &longval, type->size);
 			return ret;
 		}
 	}
