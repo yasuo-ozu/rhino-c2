@@ -87,10 +87,16 @@ rh_variable *expression_with_paren(rh_context *ctx, rh_execute_mode execMode) {
 
 rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMode);
 rh_variable *rh_execute_expression_functioncall(rh_context *ctx, rh_variable *func, rh_execute_mode execMode) {
+	// TODO: 記号表の保持
 	token_cmp_error_skip(ctx, ")");	// TODO: 本来なら引数を処理
 	rh_token *token0 = token_fetch(ctx);
+	int beforeGlobal = ctx->is_global;
+	int bp = ctx->sp;
+	ctx->is_global = 0;
 	ctx->token = func->func_body;
 	rh_statement_result res = rh_execute_statement(ctx, execMode);
+	ctx->is_global = beforeGlobal;
+	ctx->sp = bp;
 	ctx->token = token0;
 	if (execMode == EM_DISABLED) return NULL;
 	rh_variable *var = res.var;
@@ -517,36 +523,39 @@ rh_type *read_type_declarator(rh_context *ctx, rh_type *parent, rh_token **pToke
 	return ret;
 }
 
-int execute_brace_initializer(rh_context *ctx, rh_type *type, rh_execute_mode execMode) {
-	if (type->kind == RHTYP_POINTER || type->kind == RHTYP_ARRAY) {
-		int i = 0, count = -1, nest = 0, size = rh_get_typesize(type->child);
-		rh_variable *baseVar = rh_init_variable(NULL), *var2;
-		baseVar->type = type->child;
-		if (type->kind == RHTYP_ARRAY) count = type->length;
-		do {
-			if (token_cmp_skip(ctx, "{")) {
-				if (!execute_brace_initializer(ctx, type->child, execMode)) nest++;
-			} else if (token_cmp(ctx->token, "}")) {
-				if (--nest < 0) break;
-				token_next(ctx);
-			} else {
-				var2 = rh_execute_expression(ctx, execMode, 1);
-				if ((count == -1 || i < count) && execMode == EM_ENABLED) {
-					baseVar->memory = ctx->memory + ctx->hp;
-					rh_assign_variable(ctx, baseVar, var2);
-					ctx->hp += size; i++;
-				}
-			}
-		} while (token_cmp_skip(ctx, ","));
-		token_cmp_error_skip(ctx, "}");
-		while (count != -1 && i < count) {
-			memset(ctx->memory + ctx->hp, 0, size);
-			ctx->hp += size; i++;
-		}
-		if (count == -1 && type->kind == RHTYP_ARRAY) type->length = i;
-		return 1;
+int execute_brace_initializer(rh_context *ctx, rh_type *type, unsigned char *addr, rh_execute_mode execMode) {
+	if (type->kind != RHTYP_POINTER && type->kind != RHTYP_ARRAY) {
+		E_ERROR(ctx, "brace initializer must be applied to array or pointer.");
+		return 0;
 	}
-	return 0;
+	int i = 0, count = -1, nest = 0, size = rh_get_typesize(type->child);
+	rh_variable *baseVar = rh_init_variable(NULL), *var2;
+	baseVar->type = type->child;
+	if (type->kind == RHTYP_ARRAY) count = type->length;
+	do {
+		/* if (token_cmp_skip(ctx, "{")) {
+			// TODO: countをどう再帰的に伝えるか? さもなければ配列要素数未確定時等に要素数を特定できない
+			if (構造体初期化) execute_brace_initializer(ctx, type->child, execMode);
+			nest++;
+		} else */ if (token_cmp(ctx->token, "}")) {
+			if (--nest < 0) break;
+			token_next(ctx);
+		} else {
+			var2 = rh_execute_expression(ctx, execMode, 1);
+			if ((count == -1 || i < count) && execMode == EM_ENABLED) {
+				baseVar->memory = addr + i * size;
+				rh_assign_variable(ctx, baseVar, var2);
+				i++;
+			}
+		}
+	} while (token_cmp_skip(ctx, ","));
+	token_cmp_error_skip(ctx, "}");
+	if (count != -1 && i < count) {
+		if (ctx->is_global) memset(addr + size * i, 0, size * (count - i));
+		i = count;
+	}
+	if (count == -1 && type->kind == RHTYP_ARRAY) type->length = i;
+	return type->length * size;
 }
 
 rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMode);
@@ -569,12 +578,25 @@ rh_variable *rh_execute_statement_variable(rh_context *ctx, rh_execute_mode exec
 	}
 	if (token_cmp_skip(ctx, "=")) {
 		if (token_cmp_skip(ctx, "{")) {
+			// if (execMode == EM_ENABLED) {
+			// 	if (type->kind == RHTYP_POINTER) (*(int *)var->memory) = ctx->hp;
+			// 	else if (type->kind != RHTYP_ARRAY) ctx->hp -= type->size;
+			// }
+			int siz = execute_brace_initializer(ctx, type, ctx->memory + ctx->hp, execMode);
 			if (execMode == EM_ENABLED) {
-				if (type->kind == RHTYP_POINTER) (*(int *)var->memory) = ctx->hp;
-				else if (type->kind != RHTYP_ARRAY) ctx->hp -= type->size;
-			}
-			if (!execute_brace_initializer(ctx, type, execMode)) {
-				E_ERROR(ctx, "variable initialize error");
+				int addr;
+				if (ctx->is_global) {
+					// TODO: hpのアライメント
+					addr = ctx->hp;
+					ctx->hp += siz;
+				} else {
+					// TODO: spのアライメント
+					ctx->sp -= siz;
+					addr = ctx->sp;
+					memcpy(ctx->memory + ctx->sp, ctx->memory + ctx->hp, siz);	// TODO: 安全のため1バイトずつ末尾からコピーしたほうがよい
+				}
+				// TODO: 作業中
+				UNUSED(addr);
 			}
 		} else {
 			var2 = rh_execute_expression(ctx, execMode, 1);
@@ -584,7 +606,7 @@ rh_variable *rh_execute_statement_variable(rh_context *ctx, rh_execute_mode exec
 		}
 	} else {
 		if (execMode == EM_ENABLED) {
-			memset(var->memory, 0, type->size);
+			if (ctx->is_global) memset(var->memory, 0, type->size);
 		}
 	}
 	if (type->kind == RHTYP_ARRAY && type->length == -1) {
@@ -604,6 +626,10 @@ rh_variable *rh_execute_statement_function(rh_context *ctx, rh_execute_mode exec
 	var->args = NULL;
 	var->token = idToken0;
 	var->type = type;
+	if (!ctx->is_global) {
+		E_ERROR(ctx, "func decl must be in global.");
+		execMode = EM_DISABLED;
+	}
 	while (!token_cmp(token, ")")) {
 		type0 = read_type_speifier(ctx, execMode);
 		if (type0 == NULL) {	// int
@@ -739,7 +765,7 @@ rh_statement_result rh_execute_statement(rh_context *ctx, rh_execute_mode execMo
 		needsSemicolon = 0;
 	} else if (token_cmp_skip(ctx, "{")) {
 		rh_statement_result res2;
-		rh_variable *varTop = ctx->variable_top;
+		rh_variable *varTop = ctx->variable_top;	// TODO: 関数コール時のための記号表保持
 		ctx->variable_top = ctx->variable;
 		token = token_fetch(ctx);
 		while (token != NULL && !token_cmp(token, "}")) {

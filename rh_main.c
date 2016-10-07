@@ -72,6 +72,7 @@ int rh_main(int argc, char **argv) {
 	ctx->variable = NULL;
 	ctx->variable_top = NULL;
 	//ctx->depth = 0;
+	ctx->is_global = 1;
 
 	if (!(ctx->flag & RHFLAG_INTERACTIVE)) {
 		rh_token *token, *token_top = NULL;
