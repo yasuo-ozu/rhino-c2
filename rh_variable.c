@@ -18,7 +18,7 @@ rh_variable *rh_init_variable(rh_type *type) {
 	}
 	return var;
 }
-
+/*
 rh_variable *rh_init_variable_local(rh_context *ctx, rh_type *type, int depth, int isStatic) {
 	rh_variable *ret = rh_init_variable(NULL);
 	int size = type->size;
@@ -36,6 +36,7 @@ rh_variable *rh_init_variable_local(rh_context *ctx, rh_type *type, int depth, i
 	}
 	return ret;	
 }
+*/
 
 void rh_free_variable(rh_variable *var) {
 	if (var->address == -1 && var->memory != NULL) {
@@ -171,8 +172,7 @@ int rh_variable_to_int(rh_context *ctx, rh_variable *var, int *intval) {
 }
 
 void rh_assign_variable(rh_context *ctx, rh_variable *dest, rh_variable *src) {
-	rh_variable *var = rh_convert_variable(ctx, src, dest->type, 0);
+	rh_convert_variable(ctx, src, dest->type, 0);
 	memcpy(dest->memory, src->memory, dest->type->size);
 }
-
 

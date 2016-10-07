@@ -49,7 +49,8 @@ int rh_get_typesize(rh_type *type) {
 	return type->size;
 }
 
-rh_variable *rh_convert_type(rh_context ctx, rh_variable *var, int force) {
+rh_variable *rh_convert_type(rh_context *ctx, rh_variable *var, int force) {
+	UNUSED(ctx, var, force);
 	return NULL;
 }
 

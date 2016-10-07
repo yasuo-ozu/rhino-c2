@@ -16,6 +16,7 @@ char *token_symbol_table[] = {
 };
 
 rh_token *rh_init_token(rh_context *ctx) {
+	UNUSED(ctx);
 	rh_token *token = rh_malloc(sizeof(rh_token));
 	token->type = TYP_NULL;
 	token->text = NULL;

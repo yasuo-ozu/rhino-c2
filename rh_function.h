@@ -43,4 +43,11 @@ int rh_execute(rh_context *ctx);
 void rh_error(rh_context *ctx, rh_error_type type, char *msg, ...);
 void rh_dump_error(rh_context *ctx);
 
+#ifdef DEBUG
+extern char *__unused_tmpval;
+#define UNUSED(a,...)	((void)(0 && printf(__unused_tmpval,a,__VA_ARGS__+0)))
+#else
+#define UNUSED(a,...)
+#endif
+
 

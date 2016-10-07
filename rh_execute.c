@@ -446,6 +446,7 @@ rh_variable *rh_execute_expression(rh_context *ctx, rh_execute_mode execMode, in
 }
 
 rh_type *read_type_speifier(rh_context *ctx, rh_execute_mode execMode) {
+	UNUSED(execMode);
 	rh_type *ret = NULL;
 	int signedCount = 0, unsignedCount = 0, longCount = 0, size = 0, count = 0;
 	for (;;) {
@@ -643,7 +644,6 @@ rh_statement_result rh_execute_statement_type(rh_context *ctx, rh_execute_mode e
 	rh_variable *var;
 	rh_type *type;
 	rh_statement_result res = {SR_NORMAL, NULL};
-	rh_token *idToken;
 	int isFunction = 0;
 	do {
 		rh_token *idToken;

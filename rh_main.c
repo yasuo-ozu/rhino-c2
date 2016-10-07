@@ -65,15 +65,13 @@ int rh_main(int argc, char **argv) {
 		E_FATAL(ctx, "souce file not specified.");
 	}
 
-	rh_file *file;
-
 	ctx->memory = rh_malloc(RH_MEMORY_SIZE);
 	ctx->hp = 0;
 	ctx->sp = RH_MEMORY_SIZE;
 	ctx->token = NULL;
 	ctx->variable = NULL;
 	ctx->variable_top = NULL;
-	ctx->depth = 0;
+	//ctx->depth = 0;
 
 	if (!(ctx->flag & RHFLAG_INTERACTIVE)) {
 		rh_token *token, *token_top = NULL;
