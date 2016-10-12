@@ -69,10 +69,8 @@ int rh_main(int argc, char **argv) {
 	ctx->hp = 0;
 	ctx->sp = RH_MEMORY_SIZE;
 	ctx->token = NULL;
-	ctx->variable = NULL;
-	ctx->variable_top = NULL;
-	//ctx->depth = 0;
-	ctx->is_global = 1;
+	ctx->token_top = NULL;
+	ctx->token_bottom = NULL;
 
 	if (!(ctx->flag & RHFLAG_INTERACTIVE)) {
 		rh_token *token, *token_top = NULL;

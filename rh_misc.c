@@ -1,7 +1,11 @@
 #include "rh_common.h"
 
-void *rh_malloc(size_t size) {
-	return malloc(size);
+void *rh_malloc(rh_context *ctx, size_t size) {
+	void *p = malloc(size);
+	if (p == NULL) {
+		E_FATAL(ctx, "memory allocating error");
+	}
+	return p;
 }
 
 void rh_free(void *addr) {

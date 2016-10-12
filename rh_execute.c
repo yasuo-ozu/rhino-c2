@@ -1,41 +1,8 @@
 #include "rh_common.h"
 
- rh_token *token_next(rh_context *ctx) {
-	if (ctx->token == NULL)
-		return ctx->token = rh_next_token(ctx);
-	else {
-		if (ctx->token->next == NULL) ctx->token->next = rh_next_token(ctx);
-	 	return ctx->token = ctx->token->next;
-	}
- }
-
-#define token_cmp(token, /* (char *) */ ident) \
-	((token) != NULL && (token)->type != TYP_LITERAL && !strcmp((token)->text, (ident)))
-
-#define token_fetch(ctx) \
-	((ctx)->token == NULL ? ((ctx)->token = token_next(ctx)) : (ctx)->token)
-
-int token_cmp_skip(rh_context *ctx, char *ident) {
-	int ret = token_cmp(token_fetch(ctx), ident);
-	if (ret) token_next(ctx);
-	return ret;
-}
-
-int token_cmp_error_skip(rh_context *ctx, char *ident) {
-	int ret = token_cmp_skip(ctx, ident);
-	if (!ret) {
-		E_ERROR(ctx, "requires '%s'", ident);
-	}
-	return ret;
-}
-
 typedef enum {
 	EM_DISABLED = 0, EM_ENABLED = 1
 } rh_execute_mode;
-
-typedef enum {
-	OP_PREFIX = 2, OP_POSTFIX = 4, OP_BINARY = 1, OP_CONDITIONAL
-} rh_operator_type;
 
 typedef struct {
 	enum {
@@ -43,30 +10,6 @@ typedef struct {
 	} type;
 	rh_variable *var;
 } rh_statement_result;
-
-int get_priority(rh_token *token, rh_operator_type type) {
-	static struct {
-		char *symbol; int priority; int type;
-	} priority_table[] = {
-		{"[", 1, OP_POSTFIX}, {"++", 1, OP_POSTFIX}, {"--", 1, OP_POSTFIX}, 
-		{"++", 2, OP_PREFIX}, {"--", 2, OP_PREFIX}, {"+", 2, OP_PREFIX}, {"*", 2, OP_PREFIX}, {"&", 2, OP_PREFIX},
-		{"-", 2, OP_PREFIX}, {"~", 2, OP_PREFIX}, {"!", 2, OP_PREFIX}, {"*", 4, OP_BINARY}, {"/", 4, OP_BINARY},
-		{"%", 4, OP_BINARY}, {"+", 5, OP_BINARY}, {"-", 5, OP_BINARY}, {"<<", 6, OP_BINARY}, {">>", 6, OP_BINARY},
-		{"<", 7, OP_BINARY}, {"<=", 7, OP_BINARY}, {">", 7, OP_BINARY}, {">=", 7, OP_BINARY}, {"==", 8, OP_BINARY},
-		{"!=", 8, OP_BINARY}, {"&", 9, OP_BINARY}, {"^", 10, OP_BINARY}, {"|", 11, OP_BINARY}, {"&&", 12, OP_BINARY},
-		{"||", 13, OP_BINARY}, {"?", 14, OP_BINARY}, {"=", 15, OP_BINARY}, {"+=", 15, OP_BINARY}, {"-=", 15, OP_BINARY}, 
-		{"*=", 15, OP_BINARY}, {"/=", 15, OP_BINARY}, {"%=", 15, OP_BINARY}, {"<<=", 15, OP_BINARY}, {">>=", 15, OP_BINARY}, 
-		{"&=", 15, OP_BINARY}, {"^=", 15, OP_BINARY}, {"|=", 15, OP_BINARY}, {",", 16, OP_BINARY}, {0, 0, OP_BINARY}
-	};
-	int i;
-	if (token == NULL || token->type != TYP_SYMBOL) return -1;
-	for (i = 0; priority_table[i].symbol; i++) {
-		if (priority_table[i].type & type && token_cmp(token, priority_table[i].symbol)) {
-			return priority_table[i].priority;
-		}
-	}
-	return -1;
-}
 
 rh_variable *search_declarator(rh_context *ctx, char *text) {
 	rh_variable *var = ctx->variable;

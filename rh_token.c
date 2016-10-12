@@ -247,7 +247,11 @@ void rh_next_token_symbol(rh_context *ctx, char c, rh_token *token) {
 rh_token *rh_next_token(rh_context *ctx) {
 	char c = rh_getchar(ctx);
 	while (c == ' ' || c == '\t' || c == '\n') c = rh_getchar(ctx);
-	if (c == '\0') return NULL;
+	if (c == '\0') {
+		rh_token *token = rh_init_token(ctx);
+		token->type = TYP_NULL;
+		return token;
+	}
 	rh_token *token = rh_init_token(ctx);
 	if (c == '_' || ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z'))
 		rh_next_token_ident(ctx, c, token);

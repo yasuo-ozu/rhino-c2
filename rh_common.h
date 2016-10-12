@@ -13,6 +13,9 @@
 #define MAX(a,b)	((a)>(b)?(a):(b))
 #define MIN(a,b)	((a)<(b)?(a):(b))
 
+#define TRUE 	1
+#define FALSE 	0
+
 #include "rh_def.h"
 #include "rh_function.h"
 #include "rh_error.h"

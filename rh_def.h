@@ -4,6 +4,7 @@ typedef struct rh_context	rh_context;
 typedef struct rh_file		rh_file;
 typedef enum   rh_token_type rh_token_type;
 typedef struct rh_token		rh_token;
+typedef struct rh_parse		rh_parse;
 typedef struct rh_type		rh_type;
 typedef struct rh_variable	rh_variable;
 
@@ -17,10 +18,12 @@ struct rh_context {
 	rh_file *file;
 	unsigned char *memory;
 	int hp, sp;
-	rh_variable *variable, *variable_top;
+	// token_next() (rh_parse.c) によって最後に取得されたトークン
+	rh_token *token_bottom;
+	// まだ解放されてない最初のトークン。
 	rh_token *token;
-	int depth;
-	int is_global;
+	// 先読みされた先頭のトークン。
+	rh_token *token_top;
 	struct {
 		char *messages[20];
 		int errors;			// counter of ETYPE_ERROR
@@ -43,15 +46,41 @@ struct rh_file {
 /* initialized in rh_token.c */
 enum rh_token_type {
 	TYP_NULL = 0,
-	TYP_SYMBOL, TYP_IDENT, TYP_LITERAL, TYP_KEYWORD,
+	TYP_SYMBOL, TYP_IDENT, TYP_LITERAL, TYP_KEYWORD
 };
 struct rh_token {
 	enum rh_token_type type;
 	char *text;
 	rh_token *next;
 	rh_variable *variable;
+};
 
-	rh_token *child[3];
+/* Initialized in rh_parse.c */
+struct rh_parse {
+	enum {
+		PSTYP_NULL = 0,
+		// global decl
+		PSTYP_FUNC_DECL,
+		// statement
+		PSTYP_BREAK,
+		PSTYP_RETURN,
+		PSTYP_CONTINUE,
+		PSTYP_IF,
+		PSTYP_WHILE,
+		PSTYP_DOWHILE,
+		PSTYP_FOR,
+		PSTYP_COMPOUND,
+		PSTYP_VARDECL,
+		PSTYP_EXPRESSION,
+		// expression
+		PSTYP_PREOP,
+		PSTYP_POSTOP,
+		PSTYP_BINARYOP,
+		PSTYP_CONDOP,
+		PSTYP_VAR,
+	} type;
+	rh_parse *child[4];
+	rh_parse *next;		///< used by PSTYP_COMPOUND
 };
 
 /* initialized in rh_type.c */
