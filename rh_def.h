@@ -72,6 +72,7 @@ struct rh_parse {
 		PSTYP_COMPOUND,
 		PSTYP_VARDECL,
 		PSTYP_EXPRESSION,
+		PSTYP_VOIDSTAT,
 		// expression
 		PSTYP_PREOP,
 		PSTYP_POSTOP,

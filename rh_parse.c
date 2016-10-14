@@ -126,6 +126,7 @@ void rh_dump_parse_internal(rh_context *ctx, rh_parse *ps, int level) {
 	else if (ps->type == PSTYP_BREAK)		printf("%sBREAK\n", indent);
 	else if (ps->type == PSTYP_RETURN)		printf("%sRETURN\n", indent);
 	else if (ps->type == PSTYP_CONTINUE)	printf("%sCONTINUE\n", indent);
+	else if (ps->type == PSTYP_VOIDSTAT)	printf("%sVOIDSTAT\n", indent);
 	else if (ps->type == PSTYP_IF) {
 		printf("%sIF\n", indent);
 		rh_dump_parse_internal(ctx, ps->child[0], level + 1);
@@ -154,7 +155,7 @@ void rh_dump_parse_internal(rh_context *ctx, rh_parse *ps, int level) {
 	} else if (ps->type == PSTYP_VARDECL)		printf("%sVARDECL\n", indent);
 	else if (ps->type == PSTYP_EXPRESSION) {
 		printf("%sEXPRESSION\n", indent);
-	}
+	} else	printf("%sOTHER\n", indent);
 }
 
 void rh_dump_parse(rh_context *ctx, rh_parse *ps) {
@@ -216,7 +217,7 @@ rh_parse *rh_parse_statement(rh_context *ctx) {
 		ps->child[0] = ps1_bottom;
 		token_skip_cmp_error(ctx, "}");
 		semi = 0;
-	} else if (token_cmp(token0, ";")) semi = 0;
+	} else if (token_cmp(token0, ";"))			ps->type = PSTYP_VOIDSTAT, semi = 0;
 	else if (token_cmp(token0, "break"))		ps->type = PSTYP_BREAK;
 	else if (token_cmp(token0, "return"))		ps->type = PSTYP_RETURN;
 	else if (token_cmp(token0, "continue"))		ps->type = PSTYP_CONTINUE;

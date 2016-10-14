@@ -13,6 +13,7 @@ rhino:	${SRCS} ${HEADERS} Makefile
 	${CC} ${CC_OPTS} ${CC_DEBUG} -o rhino ${SRCS}
 rhino.release:	${SRCS} ${HEADERS} Makefile
 	${CC} ${CC_OPTS} ${CC_RELEASE} -o rhino.release ${SRCS}
+	strip rhino.release
 	@echo $( which upx && upx -9 rhino.release 2>&1 > /dev/null ) > /dev/null 
 	@echo "## Compressed binary file size:" `LANG=C du -b rhino.release | sed -e 's/^\([^\s]*\)\srhino.release/\1/'`
 clean:
