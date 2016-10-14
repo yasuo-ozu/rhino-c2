@@ -8,12 +8,13 @@ void *rh_malloc(rh_context *ctx, size_t size) {
 	return p;
 }
 
-void rh_free(void *addr) {
+void rh_free(rh_context *ctx, void *addr) {
+	UNUSED(ctx);
 	free(addr);
 }
 
-void *rh_malloc_string(char *s) {
-	void *p = rh_malloc(strlen(s) + 1);
-	strcpy(p, s);
-	return p;
+char *rh_malloc_string(rh_context *ctx, char *s) {
+	char *ret = rh_malloc(ctx, strlen(s) + 1);
+	strcpy(ret, s);
+	return ret;
 }

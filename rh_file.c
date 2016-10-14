@@ -1,7 +1,7 @@
 #include "rh_common.h"
 
-rh_file *rh_init_file_from_fp(FILE *fp) {
-	rh_file *file = rh_malloc(sizeof(rh_file));
+rh_file *rh_init_file_from_fp(rh_context *ctx, FILE *fp) {
+	rh_file *file = rh_malloc(ctx, sizeof(rh_file));
 	file->fp = fp;
 	file->name = NULL;
 	file->unget_buf_top = 0;
@@ -11,7 +11,7 @@ rh_file *rh_init_file_from_fp(FILE *fp) {
 	return file;
 }
 
-rh_file *rh_init_file(char *fname, int searchLocal) {
+rh_file *rh_init_file(rh_context *ctx, char *fname, int searchLocal) {
 	FILE *fp = NULL;
 	rh_file *file = NULL;
 	char buf[RH_FILENAME_MAXLEN];
@@ -29,18 +29,18 @@ rh_file *rh_init_file(char *fname, int searchLocal) {
 		i++;
 	}
 	if (fp != NULL) {
-		file = rh_init_file_from_fp(fp);
-		file->name = rh_malloc(strlen(fname) + 1);
+		file = rh_init_file_from_fp(ctx, fp);
+		file->name = rh_malloc(ctx, strlen(fname) + 1);
 		strcpy(file->name, fname);
 	}
 	return file;
 }
 
-void rh_free_file(rh_file *file) {
+void rh_free_file(rh_context *ctx, rh_file *file) {
 	if (file == NULL) return;
 	if (file->fp != stdin) fclose(file->fp);
-	if (file->name != NULL) rh_free(file->name);
-	rh_free(file);
+	if (file->name != NULL) rh_free(ctx, file->name);
+	rh_free(ctx, file);
 }
 
 void rh_ungetc(rh_context *ctx, int c) {
@@ -61,7 +61,7 @@ char rh_getc0(rh_context *ctx) {
 	if (c == -1) c = 0;
 	while (c == 0 && file->parent != NULL) {
 		ctx->file = file->parent;
-		rh_free_file(file);
+		rh_free_file(ctx, file);
 		file = ctx->file;
 		c = fgetc(file->fp);
 	}
@@ -127,7 +127,7 @@ char rh_getc(rh_context *ctx) {
 }
 
 void rh_getchar_preprocess_include(rh_context *ctx, char *fname, char a) {
-	rh_file *file = rh_init_file(fname, a == '"');
+	rh_file *file = rh_init_file(ctx, fname, a == '"');
 	if (file == NULL) {
 		// TODO: open from /usr/include
 		fprintf(stderr, "Include file open error: %s\n", fname);

@@ -1,7 +1,7 @@
 #include "rh_common.h"
 
-rh_variable *rh_init_variable(rh_type *type) {
-	rh_variable *var = rh_malloc(sizeof(rh_variable));
+rh_variable *rh_init_variable(rh_context *ctx, rh_type *type) {
+	rh_variable *var = rh_malloc(ctx, sizeof(rh_variable));
 	var->token = NULL;
 	var->type = type;
 	var->memory = NULL;
@@ -13,7 +13,7 @@ rh_variable *rh_init_variable(rh_type *type) {
 	var->args_count = -1;
 	var->func_body = NULL;
 	if (type != NULL && type->size > 0) {
-		var->memory = rh_malloc(rh_get_typesize(type));
+		var->memory = rh_malloc(ctx, rh_get_typesize(type));
 		var->address = -1;
 	}
 	return var;
@@ -38,11 +38,11 @@ rh_variable *rh_init_variable_local(rh_context *ctx, rh_type *type, int depth, i
 }
 */
 
-void rh_free_variable(rh_variable *var) {
+void rh_free_variable(rh_context *ctx, rh_variable *var) {
 	if (var->address == -1 && var->memory != NULL) {
-		rh_free(var->memory);
+		rh_free(ctx, var->memory);
 	}
-	rh_free(var);
+	rh_free(ctx, var);
 }
 
 void rh_dump_variable_internal(rh_context *ctx, unsigned char *mem, rh_type *type) {
@@ -90,17 +90,17 @@ void rh_dump_variable(rh_context *ctx, rh_variable *var) {
 	printf("\n");
 }
 
-rh_variable *rh_search_variable(rh_context *ctx, char *ident) {
-	rh_variable *decl = ctx->variable;
-	while (decl) {
-		if (strcmp(ident, decl->token->text) == 0) break;
-		decl = decl->next;
-	}
-	return decl;
-}
+// rh_variable *rh_search_variable(rh_context *ctx, char *ident) {
+// 	rh_variable *decl = ctx->variable;
+// 	while (decl) {
+// 		if (strcmp(ident, decl->token->text) == 0) break;
+// 		decl = decl->next;
+// 	}
+// 	return decl;
+// }
 
 rh_variable *rh_convert_variable(rh_context *ctx, rh_variable *var, rh_type *type, int force) {
-	rh_variable *ret = rh_init_variable(type);
+	rh_variable *ret = rh_init_variable(ctx, type);
 	if (var->type->kind == RHTYP_NUMERIC) {
 		long long intval = 0;
 		memcpy(&intval, var->memory, var->type->size);
@@ -161,13 +161,13 @@ rh_variable *rh_convert_variable(rh_context *ctx, rh_variable *var, rh_type *typ
 
 int rh_variable_to_int(rh_context *ctx, rh_variable *var, int *intval) {
 	if (var == NULL) return 0;
-	rh_type *type = rh_init_type();
+	rh_type *type = rh_init_type(ctx);
 	type->size = 4; type->sign = 1; type->kind = RHTYP_NUMERIC;
 	rh_variable *ret = rh_convert_variable(ctx, var, type, 0);
 	if (ret == NULL) return 0;
 	*intval = *(int *)ret->memory;
-	rh_free_variable(ret);
-	rh_free_type(type);
+	rh_free_variable(ctx, ret);
+	rh_free_type(ctx, type);
 	return 1;
 }
 

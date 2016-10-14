@@ -1,7 +1,7 @@
 #include "rh_common.h"
 
-rh_type *rh_init_type() {
-	rh_type *type = rh_malloc(sizeof(rh_type));
+rh_type *rh_init_type(rh_context *ctx) {
+	rh_type *type = rh_malloc(ctx, sizeof(rh_type));
 	type->kind = RHTYP_NULL;
 	type->length = 0;
 	type->child = NULL;
@@ -10,12 +10,12 @@ rh_type *rh_init_type() {
 	return type;
 }
 
-rh_type *rh_dup_type(rh_type *orig) {
-	rh_type *type = rh_init_type();
+rh_type *rh_dup_type(rh_context *ctx, rh_type *orig) {
+	rh_type *type = rh_init_type(ctx);
 	type->kind = orig->kind;
 	type->length = orig->length;
 	if (orig->child != NULL) {
-		type->child = rh_dup_type(orig->child);
+		type->child = rh_dup_type(ctx, orig->child);
 	} else {
 		type->child = NULL;
 	}
@@ -37,10 +37,10 @@ void rh_dump_type(rh_type *type) {
 	}
 }
 
-void rh_free_type(rh_type *type) {
+void rh_free_type(rh_context *ctx, rh_type *type) {
 	if (type == NULL) return;
-	rh_free_type(type->child);
-	rh_free(type);
+	rh_free_type(ctx, type->child);
+	rh_free(ctx, type);
 }
 
 int rh_get_typesize(rh_type *type) {

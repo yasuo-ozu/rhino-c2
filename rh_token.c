@@ -17,14 +17,11 @@ char *token_symbol_table[] = {
 
 rh_token *rh_init_token(rh_context *ctx) {
 	UNUSED(ctx);
-	rh_token *token = rh_malloc(sizeof(rh_token));
+	rh_token *token = rh_malloc(ctx, sizeof(rh_token));
 	token->type = TYP_NULL;
 	token->text = NULL;
 	token->next = NULL;
 	token->variable = NULL;
-	token->child[0] = NULL;
-	token->child[1] = NULL;
-	token->child[2] = NULL;
 	return token;
 }
 
@@ -49,7 +46,7 @@ void rh_next_token_ident(rh_context *ctx, char c, rh_token *token) {
 	} while (c == '_' || ('A' <= c && c <= 'Z') ||
 			('a' <= c && c <= 'z') || ('0' <= c && c <= '9'));
 	*ch++ = 0;
-	token->text = rh_malloc_string(s);
+	token->text = rh_malloc_string(ctx, s);
 	token->type = TYP_IDENT;
 	for (int i = 0; token_keyword_table[i] != NULL; i++) {
 		char *ch2 = token_keyword_table[i]; ch = s;
@@ -133,10 +130,10 @@ void rh_next_token_numdbl(rh_context *ctx, char c, rh_token *token) {
 	}
 	if (isDbl) size = countFloat ? 4 : countLong ? 16 : 8;
 	if (!isDbl) size = countLong == 2 ? 8 : 4, sign = !countUnsigned;
-	rh_type *type = rh_init_type();
+	rh_type *type = rh_init_type(ctx);
 	type->kind = isDbl ? RHTYP_FLOATING : RHTYP_NUMERIC;
 	type->size = size; type->sign = sign;
-	token->variable = rh_init_variable(type);
+	token->variable = rh_init_variable(ctx, type);
 	if (isDbl) {
 		if (size == 16) (*(long double *) token->variable->memory) = dblval;
 		if (size == 8) (*(double *) token->variable->memory) = (double) dblval;
@@ -151,11 +148,11 @@ void rh_next_token_literal(rh_context *ctx, char c, rh_token *token) {
 	token->type = TYP_LITERAL;
 	char a = c;
 	int count = 0, cval = 0, hp = ctx->hp;
-	rh_type *type = rh_init_type();
+	rh_type *type = rh_init_type(ctx);
 	type->kind = RHTYP_NUMERIC;
 	type->size = 1; type->sign = 1;
 	if (a == '"') {
-		rh_type *type2 = rh_init_type();
+		rh_type *type2 = rh_init_type(ctx);
 		type2->kind = RHTYP_POINTER;
 		type2->child = type;
 		type2->size = rh_get_typesize(type2);
@@ -203,7 +200,7 @@ void rh_next_token_literal(rh_context *ctx, char c, rh_token *token) {
 	if (a == '\'' && count == 0) {
 		E_ERROR(ctx, "char literal error");
 	}
-	rh_variable *var = rh_init_variable(type);
+	rh_variable *var = rh_init_variable(ctx, type);
 	if (a == '"') {
 		ctx->memory[hp + count] = '\0';
 		*((int *) var->memory) = hp;
@@ -240,7 +237,7 @@ void rh_next_token_symbol(rh_context *ctx, char c, rh_token *token) {
 		s[1] = '\0';
 		c = rh_getchar(ctx);
 	}
-	token->text = rh_malloc_string(s);
+	token->text = rh_malloc_string(ctx, s);
 	rh_ungetc(ctx, c);
 }
 

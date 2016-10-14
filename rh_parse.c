@@ -4,8 +4,6 @@ rh_parse *rh_init_parse(rh_context *ctx) {
 	UNUSED(ctx);
 	rh_parse *ps = rh_malloc(ctx, sizeof(rh_parse));
 	ps->type = PSTYP_NULL;
-	ps->start = NULL;
-	ps->stop = NULL;
 	ps->next = NULL;
 	for (int i = 0; i < 4; i++) ps->child[i] = NULL;
 	return ps;
@@ -16,7 +14,7 @@ rh_token *token_next(rh_context *ctx) {
 		ctx->token = ctx->token->next;
 	} else if (ctx->token == NULL || ctx->token->type != TYP_NULL) {
 		rh_token *token = rh_next_token(ctx);
-		if (ctx->token != NULL) ct->token->next = token;
+		if (ctx->token != NULL) ctx->token->next = token;
 		ctx->token = token;
 		ctx->token_top = token;
 		if (ctx->token_bottom == NULL) ctx->token_bottom = token;
@@ -43,6 +41,7 @@ int token_cmp_error(rh_context *ctx, char *ident) {
 	if (!ret) {
 		E_ERROR(ctx, "requires '%s'", ident);
 	}
+	return ret;
 }
 
 int token_skip_cmp(rh_context *ctx, char *ident) {
@@ -116,26 +115,86 @@ rh_parse *rh_parse_global_item_type(rh_context *ctx, rh_type *type0) {
 }
 */
 
+void rh_dump_parse_internal(rh_context *ctx, rh_parse *ps, int level) {
+	char indent[32];
+	int i;
+	for (i = 0; i < level; i++) indent[i] = '\t';
+	indent[i] = '\0';
+	//
+	if      (ps->type == PSTYP_NULL)		printf("%sNULL\n", indent);
+	else if (ps->type == PSTYP_FUNC_DECL)	printf("%sFUNC_DECL\n", indent);
+	else if (ps->type == PSTYP_BREAK)		printf("%sBREAK\n", indent);
+	else if (ps->type == PSTYP_RETURN)		printf("%sRETURN\n", indent);
+	else if (ps->type == PSTYP_CONTINUE)	printf("%sCONTINUE\n", indent);
+	else if (ps->type == PSTYP_IF) {
+		printf("%sIF\n", indent);
+		rh_dump_parse_internal(ctx, ps->child[0], level + 1);
+		rh_dump_parse_internal(ctx, ps->child[1], level + 1);
+		if (ps->child[2] != NULL) rh_dump_parse_internal(ctx, ps->child[2], level + 1);
+	} else if (ps->type == PSTYP_WHILE){
+		printf("%sWHILE\n", indent);
+		rh_dump_parse_internal(ctx, ps->child[0], level + 1);
+		rh_dump_parse_internal(ctx, ps->child[1], level + 1);
+	} else if (ps->type == PSTYP_DOWHILE){
+		printf("%sDOWHILE\n", indent);
+		rh_dump_parse_internal(ctx, ps->child[0], level + 1);
+		rh_dump_parse_internal(ctx, ps->child[1], level + 1);
+	} else if (ps->type == PSTYP_FOR) {
+		printf("%sFOR\n", indent);
+		rh_dump_parse_internal(ctx, ps->child[0], level + 1);
+		rh_dump_parse_internal(ctx, ps->child[1], level + 1);
+		rh_dump_parse_internal(ctx, ps->child[2], level + 1);
+		rh_dump_parse_internal(ctx, ps->child[3], level + 1);
+	} else if (ps->type == PSTYP_COMPOUND){
+		printf("%s{\n", indent);
+		for (rh_parse *ps2 = ps->child[0]; ps2 != NULL; ps2 = ps2->next) {
+			rh_dump_parse_internal(ctx, ps2, level + 1);
+		}
+		printf("%s}\n", indent);
+	} else if (ps->type == PSTYP_VARDECL)		printf("%sVARDECL\n", indent);
+	else if (ps->type == PSTYP_EXPRESSION) {
+		printf("%sEXPRESSION\n", indent);
+	}
+}
+
+void rh_dump_parse(rh_context *ctx, rh_parse *ps) {
+	rh_dump_parse_internal(ctx, ps, 0);
+}
+
+rh_parse *rh_parse_expression(rh_context *ctx, int isVector) {
+	UNUSED(isVector);
+	rh_parse *ps = rh_init_parse(ctx);
+	ps->type = PSTYP_EXPRESSION;
+	return ps;
+}
+
 rh_parse *rh_parse_statement(rh_context *ctx) {
 	int semi = 1;
 	rh_parse *ps = rh_init_parse(ctx);
 	rh_token *token0 = token_next(ctx);	// １つめのトークンを取得
+	if (token0->type == TYP_NULL) return NULL;
 	if (token_cmp(token0, "if")) {
 		ps->type = PSTYP_IF;
-		ps->child[0] = rh_parse_expression_with_paren(ctx);
+		token_skip_cmp_error(ctx, "(");
+		ps->child[0] = rh_parse_expression(ctx, FALSE);
+		token_skip_cmp_error(ctx, ")");
 		ps->child[1] = rh_parse_statement(ctx);
 		ps->child[2] = token_skip_cmp(ctx, "else") ? rh_parse_statement(ctx) : NULL;
 		semi = 0;
 	} else if (token_cmp(token0, "while")) {
 		ps->type = PSTYP_WHILE;
-		ps->child[0] = rh_parse_expression_with_paren(ctx);
+		token_skip_cmp_error(ctx, "(");
+		ps->child[0] = rh_parse_expression(ctx, FALSE);
+		token_skip_cmp_error(ctx, ")");
 		ps->child[1] = rh_parse_statement(ctx);
 		semi = 0;
 	} else if (token_cmp(token0, "do")) {
 		ps->type = PSTYP_DOWHILE;
 		ps->child[0] = rh_parse_statement(ctx);
 		token_skip_cmp_error(ctx, "while");
-		ps->child[1] = rh_parse_expression_with_paren(ctx);
+		token_skip_cmp_error(ctx, "(");
+		ps->child[1] = rh_parse_expression(ctx, FALSE);
+		token_skip_cmp_error(ctx, ")");
 	} else if (token_cmp(token0, "for")) {
 		token_skip_cmp_error(ctx, "(");
 		ps->child[0] = rh_parse_expression(ctx, TRUE);
@@ -154,7 +213,7 @@ rh_parse *rh_parse_statement(rh_context *ctx) {
 			else ps1_bottom = ps2;
 			ps1 = ps2;
 		}
-		ps->child[0] = ps1;
+		ps->child[0] = ps1_bottom;
 		token_skip_cmp_error(ctx, "}");
 		semi = 0;
 	} else if (token_cmp(token0, ";")) semi = 0;
@@ -170,10 +229,3 @@ rh_parse *rh_parse_statement(rh_context *ctx) {
 	return ps;
 }
 
-rh_parse *rh_parse_global_item(rh_context *ctx) {
-	
-}
-
-rh_parse *rh_parse_global_decl(rh_context *ctx) {
-	return rh_parse_global_item(ctx);
-}
