@@ -79,6 +79,10 @@ int rh_main(int argc, char **argv) {
 			if (ps == NULL) break;
 			rh_dump_parse(ctx, ps);
 		}
+		if (ctx->error.count) {
+			rh_dump_error(ctx);
+			ctx->error.count = 0;
+		}
 	} else {
 		while ((ps = rh_parse_statement(ctx)) != NULL) {
 			rh_dump_parse(ctx, ps);
