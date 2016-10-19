@@ -87,7 +87,6 @@ void rh_dump_variable(rh_context *ctx, rh_variable *var) {
 	rh_dump_type(var->type);
 	printf(") ");
 	rh_dump_variable_internal(ctx, var->memory, var->type);
-	printf("\n");
 }
 
 // rh_variable *rh_search_variable(rh_context *ctx, char *ident) {

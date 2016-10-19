@@ -15,13 +15,15 @@ static void rh_dump_parse_internal_expression(rh_context *ctx, rh_parse *ps) {
 	if (ps->type == PSTYP_VAR) {
 		rh_dump_variable(ctx, ps->var);
 	} else {
-		if (ps->type == PSTYP_PREOP) printf("<PRE: %s> ", ps->token->text);
+		printf("( ");
+		if (ps->type == PSTYP_PREOP) printf("<PRE: '%s'> ", ps->token->text);
 		rh_dump_parse_internal_expression(ctx, ps->child[0]);
-		if (ps->type == PSTYP_POSTOP) printf("<PST: %s> ", ps->token->text);
+		if (ps->type == PSTYP_POSTOP) printf("<PST: '%s'> ", ps->token->text);
 		else if (ps->type == PSTYP_BINARYOP) {
-			printf("<BIN: %s> ", ps->token->text);
+			printf("<BIN: '%s'> ", ps->token->text);
 			rh_dump_parse_internal_expression(ctx, ps->child[1]);
 		}
+		printf(") ");
 	}
 }
 
