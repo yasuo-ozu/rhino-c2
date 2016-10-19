@@ -19,12 +19,11 @@ void rh_read_options(rh_context *ctx, int argc, char **argv) {
 					ctx->flag |= RHFLAG_STDIN;
 				}
 				for (; *c != '\0'; c++) {
-					if (*c == 'd') ctx->flag |= RHFLAG_DEBUG;
+					if      (*c == 'd') ctx->flag |= RHFLAG_DEBUG;
 					else if (*c == 'i') ctx->flag |= RHFLAG_INTERACTIVE;
 					else {
 						E_FATAL(ctx, "unrecognized flag %c", *c);
 					}
-
 				}
 			}
 		} else {
@@ -69,14 +68,19 @@ int rh_main(int argc, char **argv) {
 	ctx->hp = 0;
 	ctx->sp = RH_MEMORY_SIZE;
 	ctx->token = NULL;
-	ctx->token_top = NULL;
-	ctx->token_bottom = NULL;
-
+	ctx->token_next = NULL;
+	ctx->token_disposed = NULL;
+	
+	rh_parse *ps;
 	if (ctx->flag & RHFLAG_INTERACTIVE) {
 		for (;;) {
 			printf("\rrhino> ");
-			rh_parse *ps = rh_parse_statement(ctx);
+			ps = rh_parse_statement(ctx);
 			if (ps == NULL) break;
+			rh_dump_parse(ctx, ps);
+		}
+	} else {
+		while ((ps = rh_parse_statement(ctx)) != NULL) {
 			rh_dump_parse(ctx, ps);
 		}
 	}

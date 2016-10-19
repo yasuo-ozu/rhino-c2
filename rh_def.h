@@ -18,12 +18,7 @@ struct rh_context {
 	rh_file *file;
 	unsigned char *memory;
 	int hp, sp;
-	// token_next() (rh_parse.c) によって最後に取得されたトークン
-	rh_token *token_bottom;
-	// まだ解放されてない最初のトークン。
-	rh_token *token;
-	// 先読みされた先頭のトークン。
-	rh_token *token_top;
+	rh_token *token, *token_next, *token_disposed;
 	struct {
 		char *messages[20];
 		int errors;			// counter of ETYPE_ERROR
@@ -82,6 +77,8 @@ struct rh_parse {
 	} type;
 	rh_parse *child[4];
 	rh_parse *next;		///< used by PSTYP_COMPOUND
+	rh_variable *var;
+	rh_token *token;
 };
 
 /* initialized in rh_type.c */
