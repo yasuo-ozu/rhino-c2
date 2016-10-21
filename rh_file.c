@@ -49,33 +49,37 @@ void rh_ungetc(rh_context *ctx, int c) {
 	ctx->file->is_linehead = 0;
 }
 
-char rh_getc0(rh_context *ctx) {
+int rh_getc1(rh_context *ctx) {
 	int c;
 	rh_file *file = ctx->file;
 	if (file->unget_buf_top)
 		c = file->unget_buf[--file->unget_buf_top];
 	else {
 		c = fgetc(file->fp);
-		if ((ctx->flag & RHFLAG_INTERACTIVE) && c == '\n') printf("   ");
+		//if ((ctx->flag & RHFLAG_INTERACTIVE) && c == '\n') printf("   ");
 	}
 	if (c == -1) c = 0;
-	while (c == 0 && file->parent != NULL) {
+	while (c <= 0 && file->parent != NULL) {
 		ctx->file = file->parent;
 		rh_free_file(ctx, file);
 		file = ctx->file;
 		c = fgetc(file->fp);
 	}
-	FILE *fp = file->fp;
+	return c;
+}
+
+char rh_getc0(rh_context *ctx) {
+	int c = rh_getc1(ctx);;
 	if (c == '\\') {
-		c = fgetc(fp);
+		c = rh_getc1(ctx);
 		if (c != '?') {
 			rh_ungetc(ctx, c);
 			c = '\\';
 		}
 	} else if (c == '?') {
-		c = fgetc(fp);
+		c = rh_getc1(ctx);
 		if (c == '?') {
-			c = fgetc(fp);
+			c = rh_getc1(ctx);
 			if      (c == '=') c = '#';
 			else if (c == '(') c = '[';
 			else if (c == '/') c = '\\';

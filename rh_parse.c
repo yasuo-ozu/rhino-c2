@@ -23,6 +23,12 @@ static void rh_dump_parse_internal_expression(rh_context *ctx, rh_parse *ps) {
 			printf("<BIN: '%s'> ", ps->token->text);
 			rh_dump_parse_internal_expression(ctx, ps->child[1]);
 		}
+		else if (ps->type == PSTYP_CONDOP) {
+			printf("<CND: '%s'> ", ps->token->text);
+			rh_dump_parse_internal_expression(ctx, ps->child[1]);
+			printf("<:> ");
+			rh_dump_parse_internal_expression(ctx, ps->child[2]);
+		}
 		printf(") ");
 	}
 }
@@ -232,6 +238,11 @@ rh_parse *rh_parse_expression_internal(rh_context *ctx, const int isVector, cons
 				ps->token = token;
 				ps->child[0] = ret;
 				ps->child[1] = rh_parse_expression_internal(ctx, isVector, priority);
+				if (priority == 14) {	// 三項演算子
+					ps->type = PSTYP_CONDOP;
+					token_skip_cmp_error(ctx, ":");
+					ps->child[2] = rh_parse_expression_internal(ctx, isVector, priority);
+				}
 				ret = ps;
 			}
 		} else {
