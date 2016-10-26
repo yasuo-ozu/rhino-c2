@@ -267,6 +267,59 @@ rh_parse *rh_parse_expression(rh_context *ctx, const int isVector) {
 	return ps;
 }
 
+rh_type *read_type_specifer(rh_context *ctx) {
+	rh_type *ret = NULL;
+	int signedCount = 0, unsignedCount = 0, longCount = 0, size = -2, count = 0;
+	for (;;) {
+		if      (token_skip_cmp(ctx, "unsigned"))	unsignedCount++, size = -1;
+		else if (token_skip_cmp(ctx, "signed"))		signedCount++, size = -1;
+		else if (token_skip_cmp(ctx, "long"))		longCount++, size = 4;
+		else if (token_skip_cmp(ctx, "char"))		size = 1, count++;
+		else if (token_skip_cmp(ctx, "short"))		size = 2, count++;
+		else if (token_skip_cmp(ctx, "int"))		size = 4, count++;
+		else break;
+	}
+	if (size == -1) size = 4;
+	if (size == -2) return NULL;
+	if (count > 1 || signedCount + unsignedCount > 1 || longCount > 2 || (longCount && size != 4)) {
+		E_ERROR(ctx, "type error");
+		return NULL;
+	}
+	ret = rh_init_type(ctx);
+	if (longCount == 2) size = 8;
+	ret->size = size;
+	ret->sign = unsignedCount ? 0 : 1;
+	ret->kind = RHTYP_NUMERIC;
+	return ret;
+}
+
+rh_type *read_type_declarator(rh_context *ctx, rh_type *parent, rh_token **pToken, int identMode) {
+	rh_type *ret = NULL;
+	if (token_skip_cmp(ctx, "(")) {
+		ret = read_type_declarator(ctx, parent, pToken, identMode);
+		token_skip_cmp_error(")");
+	} else if (token_skip_cmp(ctx, "*")) {
+		ret = read_type_declarator(ctx, parent, pToken, identMode);
+		rh_type *type = rh_init_type(ctx);
+		type->child = ret;
+		type->kind = RHTYP_POINTER;
+		type->size = 4;
+		ret = type;
+	} else {
+		ret = parent;
+		rh_token *token = token_next(ctx);
+		if (token->type == TYP_IDENT) {
+			if (identMode == -1) {
+				E_ERROR(ctx, "Unexpected identifier");
+			} else if (pToken != NULL) *pToken = token;
+		} else {
+			token_push(ctx, token);
+		}
+	}
+	// TODO: [] indexer
+	return ret;
+}
+
 rh_parse *rh_parse_statement(rh_context *ctx) {
 	int semi = 1;
 	rh_parse *ps = rh_init_parse(ctx);
@@ -322,10 +375,14 @@ rh_parse *rh_parse_statement(rh_context *ctx) {
 	else if (token_cmp(token0, "return"))		ps->type = PSTYP_RETURN;
 	else if (token_cmp(token0, "continue"))		ps->type = PSTYP_CONTINUE;
 	else {
-		// TODO: 宣言文
 		token_push(ctx, token0);
-		ps->type = PSTYP_EXPRESSION;
-		ps->child[0] = rh_parse_expression(ctx, FALSE);
+		rh_type *type = read_type_specifer(ctx);
+		if (type != NULL) {
+			// TODO: variable declaration
+		} else {
+			ps->type = PSTYP_EXPRESSION;
+			ps->child[0] = rh_parse_expression(ctx, FALSE);
+		}
 	}
 	if (semi) token_skip_cmp_error(ctx, ";");
 	return ps;
